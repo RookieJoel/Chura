@@ -1,0 +1,10 @@
+**ADR-003: CSS / UI Framework**
+
+| Title | CSS / UI Framework |
+| :---- | :---- |
+| **Context** | Chura contains UI-heavy workflows such as Project setup, Backlog management, ticket forms, Sprint boards, dashboards, Auditor review, and report presentation. The interface must be responsive, consistent, and quick to implement by a student development team. Options considered include Tailwind CSS, Bootstrap, Ant Design, and component libraries built on top of React. Bootstrap provides predefined styles but can make customization less flexible. Ant Design offers many ready-made enterprise components but introduces a stronger visual system and component dependency than the project currently needs. The project benefits from a styling approach that works naturally with Next.js, supports responsive design, and allows the team to build a custom visual identity without maintaining large custom CSS files. |
+| **Decision** | Use Tailwind CSS as the primary CSS/UI framework for Chura. Use Tailwind utility classes for layout, spacing, typography, responsive behavior, and reusable visual patterns. Shared UI patterns such as buttons, forms, cards, tickets, and board columns should be implemented as reusable React components so that utility classes are not duplicated inconsistently across pages. |
+| **Status** | **Proposed** |
+| **Consequences** | **Positive**<br>• Supports rapid UI development and responsive design.<br>• Integrates well with Next.js and React component workflows.<br>• Allows fine-grained customization without being locked into a predefined visual theme.<br>• Reduces the need for large global CSS files.<br>• Makes it easier to create consistent spacing, sizing, and responsive behavior across Project, Sprint, and Auditor views.<br>**Negative**<br>• Utility-heavy markup can become difficult to read if component boundaries are poor.<br>• The team must define reusable component patterns to avoid inconsistent class combinations.<br>• Tailwind does not provide complete enterprise widgets by itself, so complex components such as data grids or advanced charts may still require additional libraries. |
+
+*(Source: `proposal.md`.)*

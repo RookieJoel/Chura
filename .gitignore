@@ -1,0 +1,16 @@
+# Go
+backend/bin/
+*.test
+*.out
+
+# Env
+.env
+.env.local
+
+# OS
+.DS_Store
+
+.omc/
+features/
+CONTEXT.md
+progress.md
