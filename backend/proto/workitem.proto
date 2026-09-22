@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package chura.workitem.v1;
+
+option go_package = "github.com/RookieJoel/Chura/backend/internal/adapter/grpc/workitem;workitem";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+service WorkItemService {
+  rpc CreateWorkItems(stream CreateWorkItemRequest) returns (stream WorkItem);
+  rpc GetWorkItem(GetWorkItemRequest) returns (WorkItem);
+  rpc ListWorkItems(ListWorkItemsRequest) returns (ListWorkItemsResponse);
+  rpc UpdateWorkItem(UpdateWorkItemRequest) returns (WorkItem);
+  rpc DeleteWorkItem(DeleteWorkItemRequest) returns (google.protobuf.Empty);
+}
+
+message WorkItem {
+  string id = 1;
+  string project_id = 2;
+  string title = 3;
+  string description = 4;
+  WorkItemType type = 5;
+  WorkItemStatus status = 6;
+  WorkItemPriority priority = 7;
+  string assignee_id = 8;
+  string reporter_id = 9;
+  int32 story_points = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Struct features = 13;
+}
+
+enum WorkItemType { WORK_ITEM_TYPE_UNSPECIFIED = 0; TASK = 1; USER_STORY = 2; BUG = 3; }
+enum WorkItemStatus { WORK_ITEM_STATUS_UNSPECIFIED = 0; TO_DO = 1; IN_PROGRESS = 2; REVIEW = 3; DONE = 4; BLOCKED = 5; }
+enum WorkItemPriority { WORK_ITEM_PRIORITY_UNSPECIFIED = 0; LOW = 1; MEDIUM = 2; HIGH = 3; CRITICAL = 4; }
+
+message CreateWorkItemRequest { WorkItemInput work_item = 1; }
+message UpdateWorkItemRequest { string id = 1; WorkItemInput work_item = 2; }
+message WorkItemInput {
+  string project_id = 1;
+  string title = 2;
+  string description = 3;
+  WorkItemType type = 4;
+  WorkItemStatus status = 5;
+  WorkItemPriority priority = 6;
+  string assignee_id = 7;
+  string reporter_id = 8;
+  int32 story_points = 9;
+  google.protobuf.Struct features = 10;
+}
+message GetWorkItemRequest { string id = 1; }
+message ListWorkItemsRequest { string project_id = 1; }
+message ListWorkItemsResponse { repeated WorkItem work_items = 1; }
+message DeleteWorkItemRequest { string id = 1; }
