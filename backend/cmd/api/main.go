@@ -1,17 +1,68 @@
 package main
 
 import (
+	"context"
 	"log"
+	"os"
 
-	"github.com/gofiber/fiber/v2"
+	httpadapter "github.com/RookieJoel/Chura/backend/internal/adapter/http"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/postgres"
+	"github.com/RookieJoel/Chura/backend/internal/service"
 )
 
 func main() {
-	app := fiber.New()
+	ctx := context.Background()
 
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusOK)
-	})
+	databaseURL := getEnv(
+		"DATABASE_URL",
+		"postgres://postgres:postgres@localhost:5432/chura",
+	)
 
-	log.Fatal(app.Listen(":8080"))
+	frontendURL := getEnv(
+		"FRONTEND_URL",
+		"http://localhost:3000",
+	)
+
+	port := getEnv(
+		"PORT",
+		"8080",
+	)
+
+	db, err := postgres.NewPool(ctx, databaseURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// Output adapter
+	sprintRepository := postgres.NewSprintRepository(db)
+
+	// Application service
+	sprintService := service.NewSprintService(
+		sprintRepository,
+	)
+
+	// HTTP adapter
+	sprintHandler := httpadapter.NewSprintHandler(
+		sprintService,
+	)
+
+	router := httpadapter.NewRouter(
+		sprintHandler,
+		frontendURL,
+	)
+
+	if err := router.Run(":" + port); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func getEnv(key string, fallback string) string {
+	value := os.Getenv(key)
+
+	if value == "" {
+		return fallback
+	}
+
+	return value
 }
