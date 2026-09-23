@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
-	"github.com/RookieJoel/Chura/backend/internal/port/out"
 )
 
 type WorkItemRepository struct {
@@ -28,7 +27,7 @@ func (repository *WorkItemRepository) Get(id string) (domain.WorkItem, error) {
 	defer repository.mu.RUnlock()
 	item, ok := repository.items[id]
 	if !ok {
-		return domain.WorkItem{}, out.ErrNotFound
+		return domain.WorkItem{}, domain.ErrNotFound
 	}
 	return item, nil
 }
@@ -49,7 +48,7 @@ func (repository *WorkItemRepository) Update(item domain.WorkItem) (domain.WorkI
 	repository.mu.Lock()
 	defer repository.mu.Unlock()
 	if _, ok := repository.items[item.ID]; !ok {
-		return domain.WorkItem{}, out.ErrNotFound
+		return domain.WorkItem{}, domain.ErrNotFound
 	}
 	repository.items[item.ID] = item
 	return item, nil
@@ -59,7 +58,7 @@ func (repository *WorkItemRepository) Delete(id string) error {
 	repository.mu.Lock()
 	defer repository.mu.Unlock()
 	if _, ok := repository.items[id]; !ok {
-		return out.ErrNotFound
+		return domain.ErrNotFound
 	}
 	delete(repository.items, id)
 	return nil

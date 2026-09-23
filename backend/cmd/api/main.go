@@ -4,12 +4,14 @@ import (
 	"log"
 	"net"
 
-	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/grpc/workitem"
-	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/http"
-	"github.com/RookieJoel/Chura/backend/internal/adapter/memory"
+	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/grpc"
+	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
+	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
+	memory "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
 	"github.com/RookieJoel/Chura/backend/internal/service"
 	"github.com/gofiber/fiber/v2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -21,10 +23,9 @@ func main() {
 
 	workItemRepository := memory.NewWorkItemRepository()
 	workItemService := service.NewWorkItemService(workItemRepository)
-	workitemhttp.RegisterWorkItemWebSocket(app, workItemService)
 
 	grpcServer := grpc.NewServer()
-	workitemgrpc.RegisterWorkItemServiceServer(grpcServer, workitemgrpc.NewServer(workItemService))
+	workitempb.RegisterWorkItemServiceServer(grpcServer, workitemgrpc.NewServer(workItemService))
 	grpcListener, err := net.Listen("tcp", ":9000")
 	if err != nil {
 		log.Fatal(err)
@@ -34,6 +35,12 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
+
+	grpcConnection, err := grpc.NewClient("localhost:9000", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal(err)
+	}
+	workitemhttp.RegisterWorkItemWebSocket(app, workitemgrpc.NewWorkItemGateway(grpcConnection))
 
 	log.Fatal(app.Listen(":8080"))
 }

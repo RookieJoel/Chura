@@ -1,13 +1,14 @@
-package workitem
+package grpc
 
 import (
 	"context"
 	"errors"
 	"io"
 
+	"github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
 	"github.com/RookieJoel/Chura/backend/internal/domain"
-	"github.com/RookieJoel/Chura/backend/internal/port/in"
-	"github.com/RookieJoel/Chura/backend/internal/port/out"
+	"github.com/RookieJoel/Chura/backend/internal/port/driving"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -16,15 +17,15 @@ import (
 )
 
 type Server struct {
-	UnimplementedWorkItemServiceServer
-	service in.WorkItemService
+	workitem.UnimplementedWorkItemServiceServer
+	service driving.WorkItemService
 }
 
-func NewServer(service in.WorkItemService) *Server {
+func NewServer(service driving.WorkItemService) *Server {
 	return &Server{service: service}
 }
 
-func (server *Server) CreateWorkItems(stream WorkItemService_CreateWorkItemsServer) error {
+func (server *Server) CreateWorkItems(stream workitem.WorkItemService_CreateWorkItemsServer) error {
 	for {
 		request, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
@@ -48,7 +49,7 @@ func (server *Server) CreateWorkItems(stream WorkItemService_CreateWorkItemsServ
 	}
 }
 
-func (server *Server) GetWorkItem(_ context.Context, request *GetWorkItemRequest) (*WorkItem, error) {
+func (server *Server) GetWorkItem(_ context.Context, request *workitem.GetWorkItemRequest) (*workitem.WorkItem, error) {
 	item, err := server.service.GetWorkItem(request.GetId())
 	if err != nil {
 		return nil, grpcError(err)
@@ -56,13 +57,13 @@ func (server *Server) GetWorkItem(_ context.Context, request *GetWorkItemRequest
 	return workItemToProto(item)
 }
 
-func (server *Server) ListWorkItems(_ context.Context, request *ListWorkItemsRequest) (*ListWorkItemsResponse, error) {
+func (server *Server) ListWorkItems(_ context.Context, request *workitem.ListWorkItemsRequest) (*workitem.ListWorkItemsResponse, error) {
 	items, err := server.service.ListWorkItems(request.GetProjectId())
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
-	response := &ListWorkItemsResponse{WorkItems: make([]*WorkItem, 0, len(items))}
+	response := &workitem.ListWorkItemsResponse{WorkItems: make([]*workitem.WorkItem, 0, len(items))}
 	for _, item := range items {
 		workItem, err := workItemToProto(item)
 		if err != nil {
@@ -73,7 +74,7 @@ func (server *Server) ListWorkItems(_ context.Context, request *ListWorkItemsReq
 	return response, nil
 }
 
-func (server *Server) UpdateWorkItem(_ context.Context, request *UpdateWorkItemRequest) (*WorkItem, error) {
+func (server *Server) UpdateWorkItem(_ context.Context, request *workitem.UpdateWorkItemRequest) (*workitem.WorkItem, error) {
 	item := workItemFromInput(request.GetWorkItem())
 	item.ID = request.GetId()
 	updated, err := server.service.UpdateWorkItem(item)
@@ -83,14 +84,14 @@ func (server *Server) UpdateWorkItem(_ context.Context, request *UpdateWorkItemR
 	return workItemToProto(updated)
 }
 
-func (server *Server) DeleteWorkItem(_ context.Context, request *DeleteWorkItemRequest) (*emptypb.Empty, error) {
+func (server *Server) DeleteWorkItem(_ context.Context, request *workitem.DeleteWorkItemRequest) (*emptypb.Empty, error) {
 	if err := server.service.DeleteWorkItem(request.GetId()); err != nil {
 		return nil, grpcError(err)
 	}
 	return &emptypb.Empty{}, nil
 }
 
-func workItemFromInput(input *WorkItemInput) domain.WorkItem {
+func workItemFromInput(input *workitem.WorkItemInput) domain.WorkItem {
 	if input == nil {
 		return domain.WorkItem{}
 	}
@@ -117,7 +118,7 @@ func workItemFromInput(input *WorkItemInput) domain.WorkItem {
 	}
 }
 
-func workItemToProto(item domain.WorkItem) (*WorkItem, error) {
+func workItemToProto(item domain.WorkItem) (*workitem.WorkItem, error) {
 	var features *structpb.Struct
 	var err error
 	if item.Features != nil {
@@ -130,7 +131,7 @@ func workItemToProto(item domain.WorkItem) (*WorkItem, error) {
 	if len(item.ReporterIDs) > 0 {
 		reporterID = item.ReporterIDs[0]
 	}
-	return &WorkItem{
+	return &workitem.WorkItem{
 		Id:          item.ID,
 		ProjectId:   item.ProjectID,
 		Title:       item.Title,
@@ -148,98 +149,98 @@ func workItemToProto(item domain.WorkItem) (*WorkItem, error) {
 }
 
 func grpcError(err error) error {
-	if errors.Is(err, out.ErrNotFound) {
+	if errors.Is(err, domain.ErrNotFound) {
 		return status.Error(codes.NotFound, err.Error())
 	}
 	return status.Error(codes.InvalidArgument, err.Error())
 }
 
-func typeName(value WorkItemType) string {
+func typeName(value workitem.WorkItemType) string {
 	switch value {
-	case WorkItemType_TASK:
+	case workitem.WorkItemType_TASK:
 		return string(domain.WorkItemTypeTask)
-	case WorkItemType_USER_STORY:
+	case workitem.WorkItemType_USER_STORY:
 		return string(domain.WorkItemTypeUserStory)
-	case WorkItemType_BUG:
+	case workitem.WorkItemType_BUG:
 		return string(domain.WorkItemTypeBug)
 	default:
 		return ""
 	}
 }
 
-func statusName(value WorkItemStatus) string {
+func statusName(value workitem.WorkItemStatus) string {
 	switch value {
-	case WorkItemStatus_TO_DO:
+	case workitem.WorkItemStatus_TO_DO:
 		return string(domain.WorkItemStatusToDo)
-	case WorkItemStatus_IN_PROGRESS:
+	case workitem.WorkItemStatus_IN_PROGRESS:
 		return string(domain.WorkItemStatusInProgress)
-	case WorkItemStatus_REVIEW:
+	case workitem.WorkItemStatus_REVIEW:
 		return string(domain.WorkItemStatusReview)
-	case WorkItemStatus_DONE:
+	case workitem.WorkItemStatus_DONE:
 		return string(domain.WorkItemStatusDone)
-	case WorkItemStatus_BLOCKED:
+	case workitem.WorkItemStatus_BLOCKED:
 		return string(domain.WorkItemStatusBlocked)
 	default:
 		return ""
 	}
 }
 
-func priorityName(value WorkItemPriority) string {
+func priorityName(value workitem.WorkItemPriority) string {
 	switch value {
-	case WorkItemPriority_LOW:
+	case workitem.WorkItemPriority_LOW:
 		return string(domain.WorkItemPriorityLow)
-	case WorkItemPriority_MEDIUM:
+	case workitem.WorkItemPriority_MEDIUM:
 		return string(domain.WorkItemPriorityMedium)
-	case WorkItemPriority_HIGH:
+	case workitem.WorkItemPriority_HIGH:
 		return string(domain.WorkItemPriorityHigh)
-	case WorkItemPriority_CRITICAL:
+	case workitem.WorkItemPriority_CRITICAL:
 		return string(domain.WorkItemPriorityCritical)
 	default:
 		return ""
 	}
 }
 
-func typeValue(value domain.WorkItemType) WorkItemType {
+func typeValue(value domain.WorkItemType) workitem.WorkItemType {
 	switch value {
 	case domain.WorkItemTypeTask:
-		return WorkItemType_TASK
+		return workitem.WorkItemType_TASK
 	case domain.WorkItemTypeUserStory:
-		return WorkItemType_USER_STORY
+		return workitem.WorkItemType_USER_STORY
 	case domain.WorkItemTypeBug:
-		return WorkItemType_BUG
+		return workitem.WorkItemType_BUG
 	default:
-		return WorkItemType_WORK_ITEM_TYPE_UNSPECIFIED
+		return workitem.WorkItemType_WORK_ITEM_TYPE_UNSPECIFIED
 	}
 }
 
-func statusValue(value domain.WorkItemStatus) WorkItemStatus {
+func statusValue(value domain.WorkItemStatus) workitem.WorkItemStatus {
 	switch value {
 	case domain.WorkItemStatusToDo:
-		return WorkItemStatus_TO_DO
+		return workitem.WorkItemStatus_TO_DO
 	case domain.WorkItemStatusInProgress:
-		return WorkItemStatus_IN_PROGRESS
+		return workitem.WorkItemStatus_IN_PROGRESS
 	case domain.WorkItemStatusReview:
-		return WorkItemStatus_REVIEW
+		return workitem.WorkItemStatus_REVIEW
 	case domain.WorkItemStatusDone:
-		return WorkItemStatus_DONE
+		return workitem.WorkItemStatus_DONE
 	case domain.WorkItemStatusBlocked:
-		return WorkItemStatus_BLOCKED
+		return workitem.WorkItemStatus_BLOCKED
 	default:
-		return WorkItemStatus_WORK_ITEM_STATUS_UNSPECIFIED
+		return workitem.WorkItemStatus_WORK_ITEM_STATUS_UNSPECIFIED
 	}
 }
 
-func priorityValue(value domain.WorkItemPriority) WorkItemPriority {
+func priorityValue(value domain.WorkItemPriority) workitem.WorkItemPriority {
 	switch value {
 	case domain.WorkItemPriorityLow:
-		return WorkItemPriority_LOW
+		return workitem.WorkItemPriority_LOW
 	case domain.WorkItemPriorityMedium:
-		return WorkItemPriority_MEDIUM
+		return workitem.WorkItemPriority_MEDIUM
 	case domain.WorkItemPriorityHigh:
-		return WorkItemPriority_HIGH
+		return workitem.WorkItemPriority_HIGH
 	case domain.WorkItemPriorityCritical:
-		return WorkItemPriority_CRITICAL
+		return workitem.WorkItemPriority_CRITICAL
 	default:
-		return WorkItemPriority_WORK_ITEM_PRIORITY_UNSPECIFIED
+		return workitem.WorkItemPriority_WORK_ITEM_PRIORITY_UNSPECIFIED
 	}
 }
