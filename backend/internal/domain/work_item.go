@@ -36,7 +36,7 @@ type WorkItem struct {
 	Status      WorkItemStatus
 	Priority    WorkItemPriority
 	AssigneeID  string
-	ReporterID  string
+	ReporterIDs []string
 	StoryPoints int32
 	Features    map[string]any
 	CreatedAt   time.Time
