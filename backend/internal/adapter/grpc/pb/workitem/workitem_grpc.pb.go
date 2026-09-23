@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v7.36.2
-// source: proto/workitem.proto
+// source: internal/adapter/grpc/proto/workitem.proto
 
 package workitem
 
@@ -265,5 +265,5 @@ var WorkItemService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "proto/workitem.proto",
+	Metadata: "internal/adapter/grpc/proto/workitem.proto",
 }

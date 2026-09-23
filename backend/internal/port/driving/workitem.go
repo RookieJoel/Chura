@@ -1,6 +1,8 @@
-package in
+package driving
 
-import "github.com/RookieJoel/Chura/backend/internal/domain"
+import (
+	"github.com/RookieJoel/Chura/backend/internal/domain"
+)
 
 type WorkItemService interface {
 	CreateWorkItem(input domain.WorkItem) (domain.WorkItem, error)

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
-	"github.com/RookieJoel/Chura/backend/internal/port/in"
+	"github.com/RookieJoel/Chura/backend/internal/port/driven"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
 )
@@ -17,46 +17,49 @@ type workItemMessage struct {
 	WorkItem  domain.WorkItem `json:"work_item,omitempty"`
 }
 
-type workItemResponse struct {
-	Operation string          `json:"operation"`
-	WorkItem  *domain.WorkItem `json:"work_item,omitempty"`
-	WorkItems []domain.WorkItem `json:"work_items,omitempty"`
-	Error     string          `json:"error,omitempty"`
-}
-
-func RegisterWorkItemWebSocket(app *fiber.App, service in.WorkItemService) {
+func RegisterWorkItemWebSocket(app *fiber.App, gateway driven.WorkItemGateway) {
 	app.Use("/ws/work-items", func(c *fiber.Ctx) error {
-		if websocket.IsWebSocketUpgrade(c) { return c.Next() }
+		if websocket.IsWebSocketUpgrade(c) {
+			return c.Next()
+		}
 		return fiber.ErrUpgradeRequired
 	})
 	app.Get("/ws/work-items", websocket.New(func(connection *websocket.Conn) {
 		for {
 			var message workItemMessage
-			if err := connection.ReadJSON(&message); err != nil { return }
-			response := handleWorkItemMessage(service, message)
-			if err := connection.WriteJSON(response); err != nil { return }
+			if err := connection.ReadJSON(&message); err != nil {
+				return
+			}
+			response := handleWorkItemMessage(gateway, message)
+			if err := connection.WriteJSON(response); err != nil {
+				return
+			}
 		}
 	}))
 }
 
-func handleWorkItemMessage(service in.WorkItemService, message workItemMessage) workItemResponse {
+func handleWorkItemMessage(gateway driven.WorkItemGateway, message workItemMessage) workItemResponse {
 	switch strings.ToLower(strings.TrimSpace(message.Operation)) {
 	case "create":
-		item, err := service.CreateWorkItem(message.WorkItem)
+		item, err := gateway.CreateWorkItem(message.WorkItem)
 		return responseForItem("created", item, err)
 	case "get":
-		item, err := service.GetWorkItem(message.ID)
+		item, err := gateway.GetWorkItem(message.ID)
 		return responseForItem("retrieved", item, err)
 	case "list":
-		items, err := service.ListWorkItems(message.ProjectID)
-		if err != nil { return workItemResponse{Operation: "list", Error: err.Error()} }
+		items, err := gateway.ListWorkItems(message.ProjectID)
+		if err != nil {
+			return workItemResponse{Operation: "list", Error: err.Error()}
+		}
 		return workItemResponse{Operation: "listed", WorkItems: items}
 	case "update":
-		item, err := service.UpdateWorkItem(message.WorkItem)
+		item, err := gateway.UpdateWorkItem(message.WorkItem)
 		return responseForItem("updated", item, err)
 	case "delete":
-		err := service.DeleteWorkItem(message.ID)
-		if err != nil { return workItemResponse{Operation: "deleted", Error: err.Error()} }
+		err := gateway.DeleteWorkItem(message.ID)
+		if err != nil {
+			return workItemResponse{Operation: "deleted", Error: err.Error()}
+		}
 		return workItemResponse{Operation: "deleted"}
 	default:
 		return workItemResponse{Operation: message.Operation, Error: errors.New("unsupported operation").Error()}
@@ -64,6 +67,8 @@ func handleWorkItemMessage(service in.WorkItemService, message workItemMessage) 
 }
 
 func responseForItem(operation string, item domain.WorkItem, err error) workItemResponse {
-	if err != nil { return workItemResponse{Operation: operation, Error: err.Error()} }
+	if err != nil {
+		return workItemResponse{Operation: operation, Error: err.Error()}
+	}
 	return workItemResponse{Operation: operation, WorkItem: &item}
 }
