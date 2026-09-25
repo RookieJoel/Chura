@@ -30,6 +30,9 @@
   --color-teal: #0ba5a4;
   --color-teal-tint: #e6fbfa;
 
+  --color-danger: #f93a63;
+  --color-danger-tint: #ffeff4;
+
   --color-priority-high: #f04438;
   --color-priority-medium: #f79009;
   --color-priority-low: #2e90fa;
@@ -38,4 +41,73 @@
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+.work-item-markdown h1,
+.work-item-markdown h2,
+.work-item-markdown h3 {
+  color: var(--text, #1b1e27);
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.work-item-markdown h1 {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+}
+
+.work-item-markdown h2 {
+  margin: 1.25rem 0 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.25rem;
+  font-size: 1.2rem;
+}
+
+.work-item-markdown h3 {
+  margin: 1rem 0 0.35rem;
+  font-size: 1rem;
+}
+
+.work-item-markdown p {
+  margin: 0.5rem 0;
+}
+
+.work-item-markdown ul,
+.work-item-markdown ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.work-item-markdown ul {
+  list-style: disc;
+}
+
+.work-item-markdown ol {
+  list-style: decimal;
+}
+
+.work-item-markdown code {
+  border-radius: 0.25rem;
+  background: var(--background);
+  padding: 0.1rem 0.3rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+
+.work-item-markdown pre {
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  background: var(--foreground);
+  padding: 0.75rem;
+  color: #ffffff;
+}
+
+.work-item-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.work-item-markdown a {
+  color: var(--color-brand-dark);
+  text-decoration: underline;
 }

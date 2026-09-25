@@ -20,7 +20,7 @@ const TYPE_CONFIG: Record<
     label: "Bug",
     icon: BugIcon,
     className: "bg-bug-tint text-bug",
-  },
+  }
 };
 
 interface TypeBadgeProps {

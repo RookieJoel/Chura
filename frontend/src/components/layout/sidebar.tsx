@@ -14,11 +14,11 @@ import { WorkItemAvatar } from "@/components/work-items/avatar";
 import { cn } from "@/lib/cn";
 
 const NAV_ITEMS = [
-  { href: "/board", label: "Board", icon: ColumnsIcon },
+  // { href: "/board", label: "Board", icon: ColumnsIcon },
   { href: "/backlog", label: "Backlog", icon: ListIcon },
   { href: "/sprints", label: "Sprints", icon: CalendarIcon },
-  { href: "/reports", label: "Reports", icon: BarChartIcon },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
+  // { href: "/reports", label: "Reports", icon: BarChartIcon },
+  // { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 export function Sidebar() {

@@ -19,6 +19,7 @@ export interface AcceptanceCriterion {
 export interface WorkItem {
   /** Ticket key, e.g. "CHURA-109". The real API may split this into a UUID `id` plus a human-readable `key`. */
   id: string;
+  projectId?: string;
   type: WorkItemType;
   title: string;
   description?: string;
@@ -33,6 +34,7 @@ export interface WorkItem {
   /** null = unplanned, still sitting in the Backlog */
   sprintId: string | null;
   labels: string[];
+  features?: Record<string, unknown>;
   acceptanceCriteria: AcceptanceCriterion[];
   createdAt: string;
   updatedAt: string;

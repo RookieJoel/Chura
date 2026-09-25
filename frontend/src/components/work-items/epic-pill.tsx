@@ -14,15 +14,17 @@ interface EpicPillProps {
 }
 
 export function EpicPill({ epic, className }: EpicPillProps) {
+  const displayEpic = epic.trim() || "Unassigned";
+
   return (
     <span
       className={cn(
         "w-fit shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold",
-        EPIC_STYLES[epic] ?? FALLBACK_STYLE,
+        EPIC_STYLES[displayEpic] ?? FALLBACK_STYLE,
         className,
       )}
     >
-      {epic}
+      {displayEpic}
     </span>
   );
 }

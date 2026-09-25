@@ -18,9 +18,9 @@ export function TopNav() {
         <div className="h-5 w-px bg-border" />
         <div className="flex items-center gap-1.5 text-[13px] font-semibold text-text-secondary">
           <div className="flex size-[18px] items-center justify-center rounded-[5px] bg-task-tint text-[10px] font-extrabold text-task">
-            CW
+            CD
           </div>
-          Chura Web App
+          Chura Demo App
           <ChevronDownIcon className="size-3.5 text-text-tertiary" />
         </div>
       </div>

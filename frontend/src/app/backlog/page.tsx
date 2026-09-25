@@ -1,15 +1,13 @@
-import type { Metadata } from "next";
-import type { ReactNode } from "react";
-import { getActiveSprint } from "@/api/sprints";
-import { listWorkItems } from "@/api/work-items";
-import { listMembers } from "@/api/members";
-import { AppShell } from "@/components/layout/app-shell";
-import { WorkItemRow } from "@/components/work-items/work-item-row";
-import { ChevronDownIcon, PlusIcon, SearchIcon } from "@/components/icons";
-import { sumPoints } from "@/lib/work-item-utils";
-import type { WorkItem } from "@/types/work-item";
+"use client"
 
-export const metadata: Metadata = { title: "Backlog · Chura" };
+import type { ReactNode } from "react";
+import { createWorkItem, listWorkItems } from "@/api/work-items";
+import { AppShell } from "@/components/layout/app-shell";
+import { WorkItemInsertRow, WorkItemRow } from "@/components/work-items/work-item-row";
+import { ChevronDownIcon, PlusIcon } from "@/components/icons";
+import * as React from "react";
+
+import type { WorkItem } from "@/types/work-item";
 
 function SectionCard({ children }: { children: ReactNode }) {
   return (
@@ -43,93 +41,120 @@ function SectionHeader({
   );
 }
 
-export default async function BacklogPage() {
-  const [sprint, members] = await Promise.all([
-    getActiveSprint(),
-    listMembers(),
-  ]);
-  const [sprintItems, backlogItems] = await Promise.all([
-    sprint ? listWorkItems({ sprintId: sprint.id }) : Promise.resolve<WorkItem[]>([]),
-    listWorkItems({ sprintId: null }),
-  ]);
-  const membersById = new Map(members.map((member) => [member.id, member]));
+export default function BacklogPage() {
+  type ItemState = {
+    id: string;
+    status: 'pending' | 'resolved' | 'error';
+    item: WorkItem;
+    error?: string;
+  };
 
-  const renderRow = (item: WorkItem) => (
-    <WorkItemRow
-      key={item.id}
-      item={item}
-      assignee={item.assigneeId ? membersById.get(item.assigneeId) : undefined}
-    />
-  );
+  const [additionalWorkItems, setAdditionalWorkItems] = React.useState<Map<string,ItemState>>(new Map());
+  const [workItems, setWorkItems] = React.useState<WorkItem[]>([]);
+  const [listError, setListError] = React.useState<string>();
+
+  React.useEffect(() => {
+    let active = true;
+    listWorkItems({ sprintId: null })
+      .then((items) => {
+        if (active) setWorkItems(items);
+      })
+      .catch((error) => {
+        if (active) {
+          setListError(
+            error instanceof Error ? error.message : "Unable to load work items",
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleAddWorkItem = async (title: string) => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const draftItem: WorkItem = {
+      id: tempId,
+      type: "task",
+      title: trimmedTitle,
+      status: "todo",
+      blocked: false,
+      priority: "medium",
+      storyPoints: 0,
+      epic: "",
+      sprintId: null,
+      labels: [],
+      acceptanceCriteria: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const newItem: ItemState = { id: tempId, status: 'pending', item: draftItem };
+    setAdditionalWorkItems(prev => new Map(prev).set(tempId, newItem));
+
+    try {
+      const item = await createWorkItem({ title: trimmedTitle });
+      setAdditionalWorkItems(prev => {
+        const next = new Map(prev);
+        next.set(tempId, { id: tempId, status: "resolved", item });
+        return next;
+      });
+    } catch (error) {
+      setAdditionalWorkItems(prev => {
+        const next = new Map(prev);
+        next.set(tempId, {
+          id: tempId,
+          status: "error",
+          item: draftItem,
+          error: error instanceof Error ? error.message : "Unable to create work item",
+        });
+        return next;
+      });
+    }
+  };
 
   return (
     <AppShell>
       <div className="flex items-center justify-between border-b border-border bg-surface px-7 py-[18px]">
         <h1 className="m-0 text-xl font-extrabold tracking-tight">Backlog</h1>
-        <button
-          type="button"
-          className="rounded-lg bg-brand px-4 py-2.5 text-[13px] font-bold text-white"
-        >
-          Create work item
-        </button>
-      </div>
-
-      <div className="flex items-center gap-3 border-b border-border bg-surface px-7 py-3">
-        <div className="flex w-[230px] items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-text-tertiary">
-          <SearchIcon className="size-3.5" />
-          <span className="text-[12.5px]">Filter work items</span>
-        </div>
-        <div className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[12.5px] font-semibold text-text-secondary">
-          Epic: All
-          <ChevronDownIcon className="size-3.5" />
-        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-7 py-3.5 pb-6">
-        {sprint && (
-          <SectionCard>
-            <SectionHeader
-              title={sprint.name}
-              meta={`Sep 15 – Sep 29 · ${sprintItems.length} issues · ${sumPoints(sprintItems)} pts`}
-              badge={
-                <span className="rounded-full bg-story-tint px-2 py-0.5 text-[10.5px] font-bold text-story">
-                  Active
-                </span>
-              }
-              action={
-                <button
-                  type="button"
-                  className="rounded-lg border border-border bg-surface px-3.5 py-1.5 text-[12.5px] font-bold text-text-secondary"
-                >
-                  Complete sprint
-                </button>
-              }
+        <SectionCard>
+          <SectionHeader
+            title={"Project Backlog"}
+            meta={`Unassigned to sprint`}
+            action={
+              <></>
+            }
+          />
+          {listError && (
+            <p className="m-0 border-b border-border px-3.5 py-3 text-[13px] text-red-600">
+              {listError}
+            </p>
+          )}
+          {workItems.map((item) => (
+            <WorkItemRow key={item.id} item={item} />
+          ))}
+          {Array.from(additionalWorkItems.values()).map((item) => (
+            <WorkItemRow
+              key={item.id}
+              item={item.item}
+              assignee={undefined}
+              state={item.status}
+              error={item.error}
             />
-            {sprintItems.map(renderRow)}
-          </SectionCard>
-        )}
-
-        <div className="mt-4">
-          <SectionCard>
-            <SectionHeader
-              title="Backlog"
-              meta={`${backlogItems.length} issues · ${sumPoints(backlogItems)} pts`}
-              action={
-                <button
-                  type="button"
-                  className="rounded-lg bg-brand-tint px-3.5 py-1.5 text-[12.5px] font-bold text-brand-dark"
-                >
-                  Create sprint
-                </button>
-              }
-            />
-            {backlogItems.map(renderRow)}
-          </SectionCard>
-        </div>
+          ))}
+          <WorkItemInsertRow onSubmit={handleAddWorkItem} />
+        </SectionCard>
 
         <div className="mt-3.5 flex items-center gap-2 rounded-[10px] border border-dashed border-border-strong px-3.5 py-2.5 text-text-tertiary">
           <PlusIcon className="size-3.5" />
-          <span className="text-[13px] font-semibold">Create work item</span>
+          <span className="text-[13px] font-semibold">Create Sprint</span>
         </div>
       </div>
     </AppShell>
