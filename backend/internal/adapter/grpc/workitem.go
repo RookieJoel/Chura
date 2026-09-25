@@ -7,7 +7,7 @@ import (
 
 	"github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
 	"github.com/RookieJoel/Chura/backend/internal/domain"
-	"github.com/RookieJoel/Chura/backend/internal/port/driving"
+	"github.com/RookieJoel/Chura/backend/internal/port/in"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -18,10 +18,10 @@ import (
 
 type Server struct {
 	workitem.UnimplementedWorkItemServiceServer
-	service driving.WorkItemService
+	service in.WorkItemService
 }
 
-func NewServer(service driving.WorkItemService) *Server {
+func NewServer(service in.WorkItemService) *Server {
 	return &Server{service: service}
 }
 

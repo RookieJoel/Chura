@@ -6,15 +6,15 @@ import (
 	"time"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
-	"github.com/RookieJoel/Chura/backend/internal/port/driven"
+	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/google/uuid"
 )
 
 var ErrWorkItemNotFound = domain.ErrNotFound
 
-type WorkItemService struct{ repository driven.WorkItemRepository }
+type WorkItemService struct{ repository out.WorkItemRepository }
 
-func NewWorkItemService(repository driven.WorkItemRepository) *WorkItemService {
+func NewWorkItemService(repository out.WorkItemRepository) *WorkItemService {
 	return &WorkItemService{repository: repository}
 }
 

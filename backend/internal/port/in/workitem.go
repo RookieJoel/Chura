@@ -1,4 +1,4 @@
-package driving
+package in
 
 import (
 	"github.com/RookieJoel/Chura/backend/internal/domain"
