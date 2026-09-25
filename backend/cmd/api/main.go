@@ -7,7 +7,8 @@ import (
 	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/grpc"
 	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
 	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
-	memory "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
+	mongodb "github.com/RookieJoel/Chura/backend/internal/adapter/mongodb"
+	"github.com/RookieJoel/Chura/backend/internal/port/driven"
 	"github.com/RookieJoel/Chura/backend/internal/service"
 	"github.com/gofiber/fiber/v2"
 	"google.golang.org/grpc"
@@ -15,13 +16,24 @@ import (
 )
 
 func main() {
+	if err := LoadDotEnv(); err != nil {
+		log.Printf("no .env file loaded: %v", err)
+	}
+
 	app := fiber.New()
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	workItemRepository := memory.NewWorkItemRepository()
+	connection, err := mongodb.Connect()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer connection.Close()
+	var workItemRepository driven.WorkItemRepository
+	workItemRepository = connection.WorkItemsrepository
+
 	workItemService := service.NewWorkItemService(workItemRepository)
 
 	grpcServer := grpc.NewServer()
