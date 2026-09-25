@@ -25,7 +25,7 @@ message WorkItem {
   WorkItemStatus status = 6;
   WorkItemPriority priority = 7;
   string assignee_id = 8;
-  repeated string reporter_ids = 9;
+  string reporter_id = 9;
   int32 story_points = 10;
   google.protobuf.Timestamp created_at = 11;
   google.protobuf.Timestamp updated_at = 12;
@@ -46,7 +46,7 @@ message WorkItemInput {
   WorkItemStatus status = 5;
   WorkItemPriority priority = 6;
   string assignee_id = 7;
-  repeated string reporter_ids = 8;
+  string reporter_id = 8;
   int32 story_points = 9;
   google.protobuf.Struct features = 10;
 }

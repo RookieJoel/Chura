@@ -11,11 +11,12 @@ import (
 	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/grpc"
 	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
 	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
-	repository "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
+	repository "github.com/RookieJoel/Chura/backend/internal/adapter/mongodb/repository"
 	"github.com/RookieJoel/Chura/backend/internal/port/driven"
 	"github.com/RookieJoel/Chura/backend/internal/service"
 	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -31,15 +32,34 @@ func main() {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	var workItemRepository driven.WorkItemRepository = repository.NewWorkItemRepository()
-	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
-		conn, err := pgx.Connect(context.Background(), databaseURL)
-		if err != nil {
-			log.Printf("database connection failed: %v", err)
-		} else {
-			defer conn.Close(context.Background())
-			workItemRepository = repository.NewSQLWorkItemRepository(conn)
+	var workItemRepository driven.WorkItemRepository
+	if databaseURL := os.Getenv("MONGODB_URI"); databaseURL != "" {
+		databaseName := os.Getenv("MONGODB_DATABASE")
+		if databaseName == "" {
+			databaseName = "chura"
 		}
+		client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(databaseURL))
+		if err != nil {
+			log.Printf("MongoDB connection failed: %v", err)
+		} else {
+			if err := client.Ping(context.Background(), nil); err != nil {
+				_ = client.Disconnect(context.Background())
+				log.Printf("MongoDB ping failed: %v", err)
+			} else {
+				mongoRepository := repository.NewWorkItemRepository(client.Database(databaseName))
+				if err := mongoRepository.EnsureIndexes(); err != nil {
+					_ = client.Disconnect(context.Background())
+					log.Printf("MongoDB index setup failed: %v", err)
+				} else {
+					defer client.Disconnect(context.Background())
+					workItemRepository = mongoRepository
+				}
+			}
+		}
+	}
+	if workItemRepository == nil {
+		log.Println("MONGODB_URI is not configured or MongoDB is unavailable; using in-memory repository")
+		workItemRepository = repository.NewMemoryWorkItemRepository()
 	}
 	workItemService := service.NewWorkItemService(workItemRepository)
 

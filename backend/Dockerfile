@@ -10,7 +10,6 @@ FROM alpine:3.22
 
 WORKDIR /app
 COPY --from=builder /out/api ./api
-COPY db ./db
 
 EXPOSE 8080 9000
 ENTRYPOINT ["/app/api"]

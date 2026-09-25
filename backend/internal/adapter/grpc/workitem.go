@@ -100,10 +100,6 @@ func workItemFromInput(input *workitem.WorkItemInput) domain.WorkItem {
 	if input.GetFeatures() != nil {
 		features = input.GetFeatures().AsMap()
 	}
-	reporterIDs := []string(nil)
-	if input.GetReporterId() != "" {
-		reporterIDs = []string{input.GetReporterId()}
-	}
 	return domain.WorkItem{
 		ProjectID:   input.GetProjectId(),
 		Title:       input.GetTitle(),
@@ -112,7 +108,7 @@ func workItemFromInput(input *workitem.WorkItemInput) domain.WorkItem {
 		Status:      domain.WorkItemStatus(statusName(input.GetStatus())),
 		Priority:    domain.WorkItemPriority(priorityName(input.GetPriority())),
 		AssigneeID:  input.GetAssigneeId(),
-		ReporterIDs: reporterIDs,
+		ReporterID:  input.GetReporterId(),
 		StoryPoints: input.GetStoryPoints(),
 		Features:    features,
 	}
@@ -127,10 +123,6 @@ func workItemToProto(item domain.WorkItem) (*workitem.WorkItem, error) {
 			return nil, err
 		}
 	}
-	reporterID := ""
-	if len(item.ReporterIDs) > 0 {
-		reporterID = item.ReporterIDs[0]
-	}
 	return &workitem.WorkItem{
 		Id:          item.ID,
 		ProjectId:   item.ProjectID,
@@ -140,7 +132,7 @@ func workItemToProto(item domain.WorkItem) (*workitem.WorkItem, error) {
 		Status:      statusValue(item.Status),
 		Priority:    priorityValue(item.Priority),
 		AssigneeId:  item.AssigneeID,
-		ReporterId:  reporterID,
+		ReporterId:  item.ReporterID,
 		StoryPoints: item.StoryPoints,
 		CreatedAt:   timestamppb.New(item.CreatedAt),
 		UpdatedAt:   timestamppb.New(item.UpdatedAt),
