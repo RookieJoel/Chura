@@ -32,7 +32,7 @@ func main() {
 	}
 	defer connection.Close()
 	var workItemRepository driven.WorkItemRepository
-	workItemRepository = connection.WorkItems
+	workItemRepository = connection.WorkItemsrepository
 
 	workItemService := service.NewWorkItemService(workItemRepository)
 
