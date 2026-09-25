@@ -14,7 +14,7 @@ import (
 type Connection struct {
 	Client    *mongo.Client
 	Database  *mongo.Database
-	WorkItems driven.WorkItemRepository
+	WorkItemsrepository driven.WorkItemRepository
 }
 
 func Connect() (*Connection, error) {
@@ -44,7 +44,7 @@ func Connect() (*Connection, error) {
 	return &Connection{
 		Client:    client,
 		Database:  client.Database(databaseName),
-		WorkItems: workItemRepository,
+		WorkItemsrepository: workItemRepository,
 	}, nil
 }
 

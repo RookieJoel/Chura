@@ -4,7 +4,6 @@ import (
 	"log"
 	"net"
 
-	"github.com/RookieJoel/Chura/backend/internal/adapter"
 	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/grpc"
 	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
 	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
@@ -17,7 +16,7 @@ import (
 )
 
 func main() {
-	if err := adapter.LoadDotEnv(); err != nil {
+	if err := LoadDotEnv(); err != nil {
 		log.Printf("no .env file loaded: %v", err)
 	}
 
