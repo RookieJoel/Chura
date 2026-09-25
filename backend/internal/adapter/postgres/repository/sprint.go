@@ -4,19 +4,47 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"gorm.io/gorm"
 )
 
-type SprintRepository struct {
-	db *pgxpool.Pool
+type sprintModel struct {
+	gorm.Model
+	Name      string     `gorm:"column:name"`
+	Team      string     `gorm:"column:team"`
+	StartDate *time.Time `gorm:"column:start_date"`
+	EndDate   *time.Time `gorm:"column:end_date"`
+	Status    string     `gorm:"column:status"`
 }
 
-func NewSprintRepository(db *pgxpool.Pool) *SprintRepository {
+func (sprintModel) TableName() string {
+	return "sprints"
+}
+
+const sprintIDClause = "id = ?"
+
+func (m *sprintModel) toDomain() domain.Sprint {
+	return domain.Sprint{
+		ID:        strconv.FormatUint(uint64(m.ID), 10),
+		Name:      m.Name,
+		Team:      m.Team,
+		StartDate: m.StartDate,
+		EndDate:   m.EndDate,
+		Status:    domain.SprintStatus(m.Status),
+		CreatedAt: m.CreatedAt,
+		UpdatedAt: m.UpdatedAt,
+	}
+}
+
+type SprintRepository struct {
+	db *gorm.DB
+}
+
+func NewSprintRepository(db *gorm.DB) *SprintRepository {
 	return &SprintRepository{
 		db: db,
 	}
@@ -27,39 +55,20 @@ func (r *SprintRepository) Create(
 	sprint *domain.Sprint,
 ) (*domain.Sprint, error) {
 
-	id := uuid.New()
+	model := sprintModel{
+		Name:      sprint.Name,
+		Team:      sprint.Team,
+		StartDate: sprint.StartDate,
+		EndDate:   sprint.EndDate,
+		Status:    string(sprint.Status),
+	}
 
-	query := `
-		INSERT INTO sprints (
-			id,
-			name,
-			team,
-			start_date,
-			end_date,
-			status
-		)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id
-	`
-
-	err := r.db.QueryRow(
-		ctx,
-		query,
-		id,
-		sprint.Name,
-		sprint.Team,
-		sprint.StartDate,
-		sprint.EndDate,
-		sprint.Status,
-	).Scan(&id)
-
-	if err != nil {
+	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
 		return nil, fmt.Errorf("create sprint: %w", err)
 	}
 
-	sprint.ID = id.String()
-
-	return sprint, nil
+	result := model.toDomain()
+	return &result, nil
 }
 
 func (r *SprintRepository) GetByID(
@@ -67,40 +76,15 @@ func (r *SprintRepository) GetByID(
 	id string,
 ) (*domain.Sprint, error) {
 
-	sprintID, err := uuid.Parse(id)
+	sprintID, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		return nil, nil
 	}
 
-	query := `
-		SELECT
-			id,
-			name,
-			team,
-			start_date,
-			end_date,
-			status
-		FROM sprints
-		WHERE id = $1
-	`
+	var model sprintModel
 
-	var sprint domain.Sprint
-	var status string
-
-	err = r.db.QueryRow(
-		ctx,
-		query,
-		sprintID,
-	).Scan(
-		&sprintID,
-		&sprint.Name,
-		&sprint.Team,
-		&sprint.StartDate,
-		&sprint.EndDate,
-		&status,
-	)
-
-	if errors.Is(err, pgx.ErrNoRows) {
+	err = r.db.WithContext(ctx).First(&model, sprintIDClause, sprintID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 
@@ -108,64 +92,25 @@ func (r *SprintRepository) GetByID(
 		return nil, fmt.Errorf("get sprint: %w", err)
 	}
 
-	sprint.ID = sprintID.String()
-	sprint.Status = domain.SprintStatus(status)
-
-	return &sprint, nil
+	result := model.toDomain()
+	return &result, nil
 }
 
 func (r *SprintRepository) List(
 	ctx context.Context,
 ) ([]domain.Sprint, error) {
 
-	query := `
-		SELECT
-			id,
-			name,
-			team,
-			start_date,
-			end_date,
-			status
-		FROM sprints
-		ORDER BY start_date ASC NULLS LAST
-	`
+	var models []sprintModel
 
-	rows, err := r.db.Query(ctx, query)
-	if err != nil {
+	if err := r.db.WithContext(ctx).
+		Order("start_date ASC NULLS LAST").
+		Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("list sprints: %w", err)
 	}
-	defer rows.Close()
 
-	var sprints []domain.Sprint
-
-	for rows.Next() {
-		var (
-			sprint domain.Sprint
-			id     uuid.UUID
-			status string
-		)
-
-		err := rows.Scan(
-			&id,
-			&sprint.Name,
-			&sprint.Team,
-			&sprint.StartDate,
-			&sprint.EndDate,
-			&status,
-		)
-
-		if err != nil {
-			return nil, fmt.Errorf("scan sprint: %w", err)
-		}
-
-		sprint.ID = id.String()
-		sprint.Status = domain.SprintStatus(status)
-
-		sprints = append(sprints, sprint)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate sprints: %w", err)
+	sprints := make([]domain.Sprint, 0, len(models))
+	for _, model := range models {
+		sprints = append(sprints, model.toDomain())
 	}
 
 	return sprints, nil
@@ -177,42 +122,34 @@ func (r *SprintRepository) Update(
 	sprint *domain.Sprint,
 ) (*domain.Sprint, error) {
 
-	sprintID, err := uuid.Parse(id)
+	sprintID, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		return nil, nil
 	}
 
-	query := `
-		UPDATE sprints
-		SET
-			name = $2,
-			team = $3,
-			start_date = $4,
-			end_date = $5,
-			status = $6
-		WHERE id = $1
-	`
-
-	result, err := r.db.Exec(
-		ctx,
-		query,
-		sprintID,
-		sprint.Name,
-		sprint.Team,
-		sprint.StartDate,
-		sprint.EndDate,
-		sprint.Status,
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("update sprint: %w", err)
+	updates := map[string]any{
+		"name":       sprint.Name,
+		"team":       sprint.Team,
+		"start_date": sprint.StartDate,
+		"end_date":   sprint.EndDate,
+		"status":     string(sprint.Status),
+		"updated_at": time.Now(),
 	}
 
-	if result.RowsAffected() == 0 {
+	result := r.db.WithContext(ctx).
+		Model(&sprintModel{}).
+		Where(sprintIDClause, sprintID).
+		Updates(updates)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("update sprint: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
 		return nil, nil
 	}
 
-	sprint.ID = sprintID.String()
+	sprint.ID = strconv.FormatUint(sprintID, 10)
 
 	return sprint, nil
 }
@@ -222,23 +159,18 @@ func (r *SprintRepository) Delete(
 	id string,
 ) error {
 
-	sprintID, err := uuid.Parse(id)
+	sprintID, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
-		return pgx.ErrNoRows
+		return gorm.ErrRecordNotFound
 	}
 
-	query := `
-		DELETE FROM sprints
-		WHERE id = $1
-	`
-
-	result, err := r.db.Exec(ctx, query, sprintID)
-	if err != nil {
-		return fmt.Errorf("delete sprint: %w", err)
+	result := r.db.WithContext(ctx).Delete(&sprintModel{}, sprintIDClause, sprintID)
+	if result.Error != nil {
+		return fmt.Errorf("delete sprint: %w", result.Error)
 	}
 
-	if result.RowsAffected() == 0 {
-		return pgx.ErrNoRows
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
 	}
 
 	return nil

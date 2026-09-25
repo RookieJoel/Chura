@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net"
 	"os"
@@ -23,8 +22,6 @@ func main() {
 	if err := LoadDotEnv(); err != nil {
 		log.Printf("no .env file loaded: %v", err)
 	}
-	ctx := context.Background()
-
 	databaseURL := os.Getenv("DATABASE_URL")
 
 	if databaseURL == "" {
@@ -43,11 +40,15 @@ func main() {
 		port = "8080"
 	}
 
-	db, err := postgres.NewPool(ctx, databaseURL)
+	db, err := postgres.NewGormDB(databaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer sqlDB.Close()
 
 	sprintRepository := memory.NewSprintRepository(db)
 

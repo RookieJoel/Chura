@@ -21,6 +21,8 @@ type Sprint struct {
 	StartDate *time.Time   `json:"start_date,omitempty"`
 	EndDate   *time.Time   `json:"end_date,omitempty"`
 	Status    SprintStatus `json:"status"`
+	CreatedAt time.Time    `json:"created_at,omitempty"`
+	UpdatedAt time.Time    `json:"updated_at,omitempty"`
 }
 
 func (s *Sprint) Validate() error {

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
 	"github.com/RookieJoel/Chura/backend/internal/port/in"
@@ -88,12 +87,6 @@ func (h *SprintHandler) Get(c *fiber.Ctx) error {
 
 	result, err := h.service.GetSprint(c.Context(), id)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "sprint not found",
-			})
-		}
-
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
@@ -155,14 +148,14 @@ func (h *SprintHandler) Update(c *fiber.Ctx) error {
 
 	result, err := h.service.UpdateSprint(c.Context(), id, sprint)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "sprint not found",
-			})
-		}
-
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
+		})
+	}
+
+	if result == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "sprint not found",
 		})
 	}
 
