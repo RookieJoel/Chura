@@ -2,6 +2,8 @@ package mongodb
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	repository "github.com/RookieJoel/Chura/backend/internal/adapter/mongodb/repository"
 	"github.com/RookieJoel/Chura/backend/internal/port/driven"
@@ -15,7 +17,17 @@ type Connection struct {
 	WorkItems driven.WorkItemRepository
 }
 
-func Connect(ctx context.Context, uri string, databaseName string) (*Connection, error) {
+func Connect() (*Connection, error) {
+	ctx := context.Background()
+	uri := os.Getenv("MONGODB_URI")
+	if uri == "" {
+		return nil, fmt.Errorf("MONGODB_URI is required")
+	}
+	databaseName := os.Getenv("MONGODB_DATABASE")
+	if databaseName == "" {
+		databaseName = "chura"
+	}
+
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, err
@@ -36,6 +48,6 @@ func Connect(ctx context.Context, uri string, databaseName string) (*Connection,
 	}, nil
 }
 
-func (connection *Connection) Close(ctx context.Context) error {
-	return connection.Client.Disconnect(ctx)
+func (connection *Connection) Close() error {
+	return connection.Client.Disconnect(context.Background())
 }

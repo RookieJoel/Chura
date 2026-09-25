@@ -1,10 +1,8 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net"
-	"os"
 
 	"github.com/RookieJoel/Chura/backend/internal/adapter"
 	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/grpc"
@@ -29,20 +27,13 @@ func main() {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	var workItemRepository driven.WorkItemRepository 
-	if databaseURL := os.Getenv("MONGODB_URI"); databaseURL != "" {
-		databaseName := os.Getenv("MONGODB_DATABASE")
-		if databaseName == "" {
-			databaseName = "chura"
-		}
-		connection, err := mongodb.Connect(context.Background(), databaseURL, databaseName)
-		if err != nil {
-			log.Printf("MongoDB connection failed: %v", err)
-		} else {
-			defer connection.Close(context.Background())
-			workItemRepository = connection.WorkItems
-		}
+	connection, err := mongodb.Connect()
+	if err != nil {
+		log.Fatal(err)
 	}
+	defer connection.Close()
+	var workItemRepository driven.WorkItemRepository
+	workItemRepository = connection.WorkItems
 
 	workItemService := service.NewWorkItemService(workItemRepository)
 
