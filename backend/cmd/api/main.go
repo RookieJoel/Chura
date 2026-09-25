@@ -11,7 +11,6 @@ import (
 	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
 	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
 	mongodb "github.com/RookieJoel/Chura/backend/internal/adapter/mongodb"
-	repository "github.com/RookieJoel/Chura/backend/internal/adapter/mongodb/repository"
 	"github.com/RookieJoel/Chura/backend/internal/port/driven"
 	"github.com/RookieJoel/Chura/backend/internal/service"
 	"github.com/gofiber/fiber/v2"
@@ -30,7 +29,7 @@ func main() {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	var workItemRepository driven.WorkItemRepository = repository.NewMemoryWorkItemRepository()
+	var workItemRepository driven.WorkItemRepository 
 	if databaseURL := os.Getenv("MONGODB_URI"); databaseURL != "" {
 		databaseName := os.Getenv("MONGODB_DATABASE")
 		if databaseName == "" {
