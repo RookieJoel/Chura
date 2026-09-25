@@ -30,7 +30,7 @@ func main() {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	var workItemRepository driven.WorkItemRepository
+	var workItemRepository driven.WorkItemRepository = repository.NewMemoryWorkItemRepository()
 	if databaseURL := os.Getenv("MONGODB_URI"); databaseURL != "" {
 		databaseName := os.Getenv("MONGODB_DATABASE")
 		if databaseName == "" {
@@ -40,14 +40,8 @@ func main() {
 		if err != nil {
 			log.Printf("MongoDB connection failed: %v", err)
 		} else {
-			mongoRepository := repository.NewWorkItemRepository(connection.Database)
-			if err := mongoRepository.EnsureIndexes(); err != nil {
-				_ = connection.Close(context.Background())
-				log.Printf("MongoDB index setup failed: %v", err)
-			} else {
-				defer connection.Close(context.Background())
-				workItemRepository = mongoRepository
-			}
+			defer connection.Close(context.Background())
+			workItemRepository = connection.WorkItems
 		}
 	}
 
