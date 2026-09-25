@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	repository "github.com/RookieJoel/Chura/backend/internal/adapter/mongodb/repository"
+	repository "github.com/RookieJoel/Chura/backend/internal/adapter/db/mongodb/repository"
 	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"

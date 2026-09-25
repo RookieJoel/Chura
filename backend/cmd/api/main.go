@@ -5,13 +5,12 @@ import (
 	"net"
 	"os"
 
+	"github.com/RookieJoel/Chura/backend/internal/adapter/db"
+	memory "github.com/RookieJoel/Chura/backend/internal/adapter/db/postgres/repository"
 	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/grpc"
 	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
 	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
-	mongodb "github.com/RookieJoel/Chura/backend/internal/adapter/mongodb"
-	"github.com/RookieJoel/Chura/backend/internal/adapter/postgres"
-	memory "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
 	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/RookieJoel/Chura/backend/internal/service"
 	"google.golang.org/grpc"
@@ -40,17 +39,20 @@ func main() {
 		port = "8080"
 	}
 
-	db, err := postgres.NewGormDB(databaseURL)
+	postgresDB, err := db.ConnectPostgresDB(databaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer sqlDB.Close()
 
-	sprintRepository := memory.NewSprintRepository(db)
+	mongoConnection, err := db.ConnectMongoDB()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	connections := &db.Connections{Postgres: postgresDB, Mongo: mongoConnection}
+	defer connections.Close()
+
+	sprintRepository := memory.NewSprintRepository(connections.Postgres)
 
 	sprintService := service.NewSprintService(
 		sprintRepository,
@@ -65,12 +67,7 @@ func main() {
 		frontendURL,
 	)
 
-	connection, err := mongodb.Connect()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer connection.Close()
-	var workItemRepository out.WorkItemRepository = connection.WorkItemsrepository
+	var workItemRepository out.WorkItemRepository = connections.Mongo.WorkItemsrepository
 
 	workItemService := service.NewWorkItemService(workItemRepository)
 
