@@ -7,8 +7,8 @@ import (
 
 	"github.com/RookieJoel/Chura/backend/internal/adapter/db"
 	memory "github.com/RookieJoel/Chura/backend/internal/adapter/db/postgres/repository"
-	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/grpc"
-	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
+	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc"
+	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
 	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
 	"github.com/RookieJoel/Chura/backend/internal/port/out"

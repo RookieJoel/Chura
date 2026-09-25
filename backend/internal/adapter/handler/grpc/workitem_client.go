@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem"
 	"github.com/RookieJoel/Chura/backend/internal/domain"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/structpb"

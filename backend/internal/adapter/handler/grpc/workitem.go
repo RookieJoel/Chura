@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem"
 	"github.com/RookieJoel/Chura/backend/internal/domain"
 	"github.com/RookieJoel/Chura/backend/internal/port/in"
 
