@@ -1,4 +1,4 @@
-.PHONY: build lint test generate generate-proto migrate-up migrate-down
+.PHONY: build lint test generate-proto migrate-up migrate-down
 
 -include .env
 export DATABASE_URL
@@ -11,9 +11,6 @@ lint:
 
 test:
 	go test -race ./...
-
-generate:
-	sqlc generate
 
 generate-proto:
 	protoc --go_out=. --go_opt=module=github.com/RookieJoel/Chura/backend --go-grpc_out=. --go-grpc_opt=module=github.com/RookieJoel/Chura/backend internal/adapter/handler/grpc/proto/workitem.proto

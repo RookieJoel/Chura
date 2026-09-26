@@ -93,13 +93,71 @@ Open http://localhost:3000.
 
 ## 6. Test the backend
 
-- REST (sprints): import `backend/docs/postman/Chura-REST.postman_collection.json` +
-  `Chura.postman_environment.json` into Postman, or use curl — see
-  `backend/docs/testing/manual-testing.md`.
-- gRPC (work items): `backend/docs/postman/grpc-workitem.md` — manual Postman gRPC setup +
-  a ready `grpcurl` script.
-- Proving DB writes for real (psql/mongosh commands): also in
-  `backend/docs/testing/manual-testing.md`.
+### REST (sprints) — import into Postman
+
+1. Postman → **Import** (top-left) → select
+   `backend/docs/postman/Chura-REST.postman_collection.json` → Import.
+2. **Import** again → select `backend/docs/postman/Chura.postman_environment.json` → Import.
+3. Top-right environment dropdown → pick **Chura - Local**.
+4. Backend must be running (step 4 above).
+5. Open the collection, run requests top to bottom: Health Check → Create → List → Get By Id →
+   Update → Create Invalid (expect 400) → Delete → Get After Delete (expect 404).
+   Create must run first — it captures `sprint_id` into a collection variable the rest reuse.
+6. Or run the whole thing at once: collection **···** → **Run collection** (Runner executes all
+   requests + `pm.test` assertions, shows pass/fail).
+
+Curl equivalent, if you don't want Postman:
+
+```bash
+curl -s -X POST localhost:8080/api/v1/sprints -H 'Content-Type: application/json' \
+  -d '{"name":"Sprint 1","team":"Platform","start_date":"2026-10-01","end_date":"2026-10-14","status":"planned"}' | tee /tmp/sprint.json
+
+SPRINT_ID=$(python3 -c "import json;print(json.load(open('/tmp/sprint.json'))['id'])")
+curl -s localhost:8080/api/v1/sprints/$SPRINT_ID
+curl -s -X PUT localhost:8080/api/v1/sprints/$SPRINT_ID -H 'Content-Type: application/json' \
+  -d '{"name":"Sprint 1","team":"Platform","status":"active"}'
+curl -s -X DELETE localhost:8080/api/v1/sprints/$SPRINT_ID -w '%{http_code}\n'
+```
+
+### gRPC (work items) — Postman can't import this one as JSON
+
+Postman has no export/import path for gRPC requests yet (confirmed against their own community
+forum). So it's built manually in the app, once, then saved into a collection:
+
+1. Postman → **New** → **gRPC Request**.
+2. URL field: `localhost:9000` (or your `GRPC_PORT` value if you changed it — no `grpc://`
+   prefix, Postman adds that itself; make sure the field has your real value, not the
+   `<value>` placeholder text).
+3. **Service definition** tab → **Select .proto file** → browse to
+   `backend/internal/adapter/handler/grpc/proto/workitem.proto` → Import.
+4. Method dropdown (top, next to URL) → pick a method. Start with `GetWorkItem` (unary, simplest)
+   to confirm the connection works before touching the streaming one.
+5. **Message** tab → **Use Example Message** to scaffold JSON, edit values.
+6. Unary methods (`GetWorkItem`, `ListWorkItems`, `UpdateWorkItem`, `DeleteWorkItem`): click
+   **Invoke** — one request, one response.
+7. `CreateWorkItems` is client-streaming — different flow:
+   - Click **Invoke** (opens the stream, button becomes **Send**)
+   - Click **Send** to push the message — server replies per-message, appears in Responses
+   - Click **End Streaming** to close cleanly
+8. Save each configured request into a new collection (e.g. "Chura - gRPC") so you don't have
+   to reconfigure next time — that save works fine, it's only cross-machine JSON import that's
+   unsupported.
+
+Scriptable alternative (no manual UI setup, good for repeat runs / CI) — full copy-paste
+`grpcurl` script for create/get/list/update/delete: `backend/docs/postman/grpc-workitem.md`.
+
+### Prove it hit the real DB
+
+```bash
+# Postgres — run after each REST step above
+psql postgres://chura:chura@localhost:5434/chura -c \
+  "select id, name, team, status, start_date, end_date, created_at, updated_at, deleted_at from sprints order by id;"
+
+# Mongo — run after each grpcurl/Postman gRPC step
+mongosh "mongodb://localhost:27017/chura" --eval "db.work_items.find().pretty()"
+```
+
+Full walkthrough with expected output at each step: `backend/docs/testing/manual-testing.md`.
 
 ## Common issues
 
