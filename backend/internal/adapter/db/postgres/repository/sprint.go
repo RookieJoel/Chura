@@ -149,9 +149,15 @@ func (r *SprintRepository) Update(
 		return nil, nil
 	}
 
-	sprint.ID = strconv.FormatUint(sprintID, 10)
+	var model sprintModel
 
-	return sprint, nil
+	if err := r.db.WithContext(ctx).First(&model, sprintIDClause, sprintID).Error; err != nil {
+		return nil, fmt.Errorf("reload updated sprint: %w", err)
+	}
+
+	updated := model.toDomain()
+
+	return &updated, nil
 }
 
 func (r *SprintRepository) Delete(

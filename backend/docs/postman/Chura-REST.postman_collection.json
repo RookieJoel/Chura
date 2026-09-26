@@ -1,0 +1,206 @@
+{
+  "info": {
+    "name": "Chura - REST (Sprint API)",
+    "description": "CRUD test set for the Sprint REST API (Fiber + GORM + Postgres). Run requests top to bottom, or use Collection Runner. `sprint_id` is captured automatically from the Create response and reused by the later requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080", "type": "string" },
+    { "key": "sprint_id", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', () => pm.response.to.have.status(200));",
+              "pm.test('status field is healthy', () => pm.expect(pm.response.json().status).to.eql('healthy'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sprint - Create",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sprint 1 - Foundation\",\n  \"team\": \"Platform\",\n  \"start_date\": \"2026-10-01\",\n  \"end_date\": \"2026-10-14\",\n  \"status\": \"planned\"\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/v1/sprints", "host": ["{{base_url}}"], "path": ["api", "v1", "sprints"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.test('id is present', () => pm.expect(body.id).to.be.a('string').and.not.empty);",
+              "pm.collectionVariables.set('sprint_id', body.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sprint - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{base_url}}/api/v1/sprints", "host": ["{{base_url}}"], "path": ["api", "v1", "sprints"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', () => pm.response.to.have.status(200));",
+              "pm.test('response is array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+              "pm.test('created sprint is in list', () => {",
+              "  const ids = pm.response.json().map(s => s.id);",
+              "  pm.expect(ids).to.include(pm.collectionVariables.get('sprint_id'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sprint - Get By Id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/sprints/{{sprint_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sprints", "{{sprint_id}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', () => pm.response.to.have.status(200));",
+              "pm.test('id matches', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('sprint_id')));",
+              "pm.test('status is planned', () => pm.expect(pm.response.json().status).to.eql('planned'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sprint - Update (planned -> active)",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sprint 1 - Foundation\",\n  \"team\": \"Platform\",\n  \"start_date\": \"2026-10-01\",\n  \"end_date\": \"2026-10-14\",\n  \"status\": \"active\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/sprints/{{sprint_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sprints", "{{sprint_id}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', () => pm.response.to.have.status(200));",
+              "pm.test('status updated to active', () => pm.expect(pm.response.json().status).to.eql('active'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sprint - Create Invalid (missing name, expect 400)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"team\": \"Platform\",\n  \"status\": \"planned\"\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/v1/sprints", "host": ["{{base_url}}"], "path": ["api", "v1", "sprints"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 400', () => pm.response.to.have.status(400));",
+              "pm.test('error message present', () => pm.expect(pm.response.json().error).to.be.a('string'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sprint - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/sprints/{{sprint_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sprints", "{{sprint_id}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sprint - Get After Delete (expect 404)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/sprints/{{sprint_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sprints", "{{sprint_id}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 404 (soft-deleted, gorm excludes it)', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

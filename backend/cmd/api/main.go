@@ -39,6 +39,12 @@ func main() {
 		port = "8080"
 	}
 
+	grpcPort := os.Getenv("GRPC_PORT")
+
+	if grpcPort == "" {
+		grpcPort = "9000"
+	}
+
 	postgresDB, err := db.ConnectPostgresDB(databaseURL)
 	if err != nil {
 		log.Fatal(err)
@@ -73,7 +79,7 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	workitempb.RegisterWorkItemServiceServer(grpcServer, workitemgrpc.NewServer(workItemService))
-	grpcListener, err := net.Listen("tcp", ":9000")
+	grpcListener, err := net.Listen("tcp", ":"+grpcPort)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -83,13 +89,13 @@ func main() {
 		}
 	}()
 
-	grpcConnection, err := grpc.NewClient("localhost:9000", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	grpcConnection, err := grpc.NewClient("localhost:"+grpcPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
 	}
 	workitemhttp.RegisterWorkItemWebSocket(app, workitemgrpc.NewWorkItemGateway(grpcConnection))
 
-	log.Printf("server running on :%s", port)
+	log.Printf("server running on :%s (grpc :%s)", port, grpcPort)
 
 	if err := app.Listen(":" + port); err != nil {
 		log.Fatal(err)

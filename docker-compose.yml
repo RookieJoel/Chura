@@ -14,6 +14,23 @@ services:
       timeout: 5s
       retries: 10
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: chura-postgres
+    environment:
+      POSTGRES_USER: chura
+      POSTGRES_PASSWORD: chura
+      POSTGRES_DB: chura
+    ports:
+      - "5434:5432"
+    volumes:
+      - chura-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chura -d chura"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: ./backend
@@ -22,8 +39,11 @@ services:
     environment:
       MONGODB_URI: mongodb://db:27017
       MONGODB_DATABASE: chura
+      DATABASE_URL: postgres://chura:chura@postgres:5432/chura?sslmode=disable
     depends_on:
       db:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     ports:
       - "8080:8080"
@@ -44,3 +64,4 @@ services:
 
 volumes:
   chura-mongo-data:
+  chura-postgres-data:
