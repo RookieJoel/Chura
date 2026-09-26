@@ -1,4 +1,4 @@
-package driven
+package out
 
 import (
 	"github.com/RookieJoel/Chura/backend/internal/domain"

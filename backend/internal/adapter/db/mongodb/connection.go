@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"os"
 
-	repository "github.com/RookieJoel/Chura/backend/internal/adapter/mongodb/repository"
-	"github.com/RookieJoel/Chura/backend/internal/port/driven"
+	repository "github.com/RookieJoel/Chura/backend/internal/adapter/db/mongodb/repository"
+	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Connection struct {
-	Client    *mongo.Client
-	Database  *mongo.Database
-	WorkItemsrepository driven.WorkItemRepository
+	Client              *mongo.Client
+	Database            *mongo.Database
+	WorkItemsrepository out.WorkItemRepository
 }
 
 func Connect() (*Connection, error) {
@@ -42,8 +42,8 @@ func Connect() (*Connection, error) {
 		return nil, err
 	}
 	return &Connection{
-		Client:    client,
-		Database:  client.Database(databaseName),
+		Client:              client,
+		Database:            client.Database(databaseName),
 		WorkItemsrepository: workItemRepository,
 	}, nil
 }

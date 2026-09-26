@@ -3,14 +3,16 @@ package main
 import (
 	"log"
 	"net"
+	"os"
 
-	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/grpc"
-	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/db"
+	memory "github.com/RookieJoel/Chura/backend/internal/adapter/db/postgres/repository"
+	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc"
+	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
 	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
-	mongodb "github.com/RookieJoel/Chura/backend/internal/adapter/mongodb"
-	"github.com/RookieJoel/Chura/backend/internal/port/driven"
+	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/RookieJoel/Chura/backend/internal/service"
-	"github.com/gofiber/fiber/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -19,20 +21,53 @@ func main() {
 	if err := LoadDotEnv(); err != nil {
 		log.Printf("no .env file loaded: %v", err)
 	}
+	databaseURL := os.Getenv("DATABASE_URL")
 
-	app := fiber.New()
+	if databaseURL == "" {
+		log.Fatal("DATABASE_URL is not set")
+	}
 
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusOK)
-	})
+	frontendURL := os.Getenv("FRONTEND_URL")
 
-	connection, err := mongodb.Connect()
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000"
+	}
+
+	port := os.Getenv("PORT")
+
+	if port == "" {
+		port = "8080"
+	}
+
+	postgresDB, err := db.ConnectPostgresDB(databaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer connection.Close()
-	var workItemRepository driven.WorkItemRepository
-	workItemRepository = connection.WorkItemsrepository
+
+	mongoConnection, err := db.ConnectMongoDB()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	connections := &db.Connections{Postgres: postgresDB, Mongo: mongoConnection}
+	defer connections.Close()
+
+	sprintRepository := memory.NewSprintRepository(connections.Postgres)
+
+	sprintService := service.NewSprintService(
+		sprintRepository,
+	)
+
+	sprintHandler := http.NewSprintHandler(
+		sprintService,
+	)
+
+	app := http.NewRouter(
+		sprintHandler,
+		frontendURL,
+	)
+
+	var workItemRepository out.WorkItemRepository = connections.Mongo.WorkItemsrepository
 
 	workItemService := service.NewWorkItemService(workItemRepository)
 
@@ -54,5 +89,9 @@ func main() {
 	}
 	workitemhttp.RegisterWorkItemWebSocket(app, workitemgrpc.NewWorkItemGateway(grpcConnection))
 
-	log.Fatal(app.Listen(":8080"))
+	log.Printf("server running on :%s", port)
+
+	if err := app.Listen(":" + port); err != nil {
+		log.Fatal(err)
+	}
 }

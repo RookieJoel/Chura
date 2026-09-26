@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
-	"github.com/RookieJoel/Chura/backend/internal/port/driven"
+	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var _ driven.WorkItemRepository = (*WorkItemRepository)(nil)
+var _ out.WorkItemRepository = (*WorkItemRepository)(nil)
 
 type WorkItemRepository struct {
 	collection *mongo.Collection

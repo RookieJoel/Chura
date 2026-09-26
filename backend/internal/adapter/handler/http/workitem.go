@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
-	"github.com/RookieJoel/Chura/backend/internal/port/driven"
+	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
 )
@@ -17,7 +17,7 @@ type workItemMessage struct {
 	WorkItem  domain.WorkItem `json:"work_item,omitempty"`
 }
 
-func RegisterWorkItemWebSocket(app *fiber.App, gateway driven.WorkItemGateway) {
+func RegisterWorkItemWebSocket(app *fiber.App, gateway out.WorkItemGateway) {
 	app.Use("/ws/work-items", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
 			return c.Next()
@@ -38,7 +38,7 @@ func RegisterWorkItemWebSocket(app *fiber.App, gateway driven.WorkItemGateway) {
 	}))
 }
 
-func handleWorkItemMessage(gateway driven.WorkItemGateway, message workItemMessage) workItemResponse {
+func handleWorkItemMessage(gateway out.WorkItemGateway, message workItemMessage) workItemResponse {
 	switch strings.ToLower(strings.TrimSpace(message.Operation)) {
 	case "create":
 		item, err := gateway.CreateWorkItem(message.WorkItem)
