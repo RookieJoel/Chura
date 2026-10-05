@@ -5,5 +5,6 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("work item not found")
+	ErrNotFound       = errors.New("work item not found")
+	ErrSprintNotFound = errors.New("sprint not found")
 )
