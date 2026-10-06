@@ -32,6 +32,12 @@ func (f fakeReflectionRepo) ListBySprintID(context.Context, string) ([]domain.Sp
 	return f.items, nil
 }
 
+type fakeWorkSummary struct{}
+
+func (fakeWorkSummary) GetSprintWorkSummary(context.Context, string) (domain.SprintWorkSummary, error) {
+	return domain.SprintWorkSummary{Planned: 10, Completed: 7, CarryOver: 2, Blocked: 1}, nil
+}
+
 type fakeExporter struct{}
 
 func (fakeExporter) Export(s *domain.SprintReviewSummary) ([]byte, error) {
@@ -42,12 +48,13 @@ func newTestAnalytics(sprint *domain.Sprint, items []domain.SprintReflection) *A
 	return NewAnalyticsService(
 		fakeSprintRepo{sprint: sprint},
 		fakeReflectionRepo{items: items},
+		fakeWorkSummary{},
 		fakeExporter{},
 	)
 }
 
 func TestRetrieveSprintReflection(t *testing.T) {
-	items := []domain.SprintReflection{{ID: "1", SprintID: "1", Author: "a", Content: "good"}}
+	items := []domain.SprintReflection{{ID: "1", SprintID: "1", Author: "a", Answers: map[string]string{domain.ReflectionWhatWentWell: "good"}}}
 	svc := newTestAnalytics(&domain.Sprint{ID: "1", Name: "S1"}, items)
 
 	got, err := svc.RetrieveSprintReflection(context.Background(), "1")
@@ -73,8 +80,11 @@ func TestGenerateSprintReviewSummary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ReflectionCount != 2 || got.Sprint.Name != "S1" {
+	if len(got.Qualitative.Reflections) != 2 || got.Sprint.Name != "S1" {
 		t.Fatalf("unexpected summary %+v", got)
+	}
+	if got.Quantitative.Work.Planned != 10 || got.Quantitative.Work.Completed != 7 {
+		t.Fatalf("unexpected quantitative %+v", got.Quantitative)
 	}
 }
 

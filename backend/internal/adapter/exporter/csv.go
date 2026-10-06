@@ -19,16 +19,27 @@ func (e *CSVExporter) Export(summary *domain.SprintReviewSummary) ([]byte, error
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
 
+	work := summary.Quantitative.Work
 	rows := [][]string{
 		{"sprint", summary.Sprint.Name},
 		{"team", summary.Sprint.Team},
 		{"status", string(summary.Sprint.Status)},
-		{"reflection_count", strconv.Itoa(summary.ReflectionCount)},
 		{},
-		{"author", "content", "created_at"},
+		{"quantitative", "count"},
+		{"planned", strconv.Itoa(work.Planned)},
+		{"completed", strconv.Itoa(work.Completed)},
+		{"carry_over", strconv.Itoa(work.CarryOver)},
+		{"blocked", strconv.Itoa(work.Blocked)},
+		{},
+		{"qualitative", "author", "attribute", "answer", "created_at"},
 	}
-	for _, r := range summary.Reflections {
-		rows = append(rows, []string{r.Author, r.Content, r.CreatedAt.Format(time.RFC3339)})
+
+	for _, r := range summary.Qualitative.Reflections {
+		for _, key := range domain.DefaultReflectionTemplate() {
+			rows = append(rows, []string{
+				"reflection", r.Author, key, r.Answers[key], r.CreatedAt.Format(time.RFC3339),
+			})
+		}
 	}
 
 	if err := w.WriteAll(rows); err != nil {

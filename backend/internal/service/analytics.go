@@ -11,17 +11,20 @@ import (
 type AnalyticsService struct {
 	sprints     out.SprintRepository
 	reflections out.ReflectionRepository
+	workSummary out.SprintWorkSummaryProvider
 	exporter    out.ReportExporter
 }
 
 func NewAnalyticsService(
 	sprints out.SprintRepository,
 	reflections out.ReflectionRepository,
+	workSummary out.SprintWorkSummaryProvider,
 	exporter out.ReportExporter,
 ) *AnalyticsService {
 	return &AnalyticsService{
 		sprints:     sprints,
 		reflections: reflections,
+		workSummary: workSummary,
 		exporter:    exporter,
 	}
 }
@@ -53,11 +56,16 @@ func (s *AnalyticsService) GenerateSprintReviewSummary(
 		return nil, err
 	}
 
+	work, err := s.workSummary.GetSprintWorkSummary(ctx, sprintID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &domain.SprintReviewSummary{
-		Sprint:          *sprint,
-		Reflections:     reflections,
-		ReflectionCount: len(reflections),
-		GeneratedAt:     time.Now(),
+		Sprint:       *sprint,
+		Quantitative: domain.QuantitativeSummary{Work: work},
+		Qualitative:  domain.QualitativeSummary{Reflections: reflections},
+		GeneratedAt:  time.Now(),
 	}, nil
 }
 

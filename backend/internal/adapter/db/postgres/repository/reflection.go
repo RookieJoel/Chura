@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -14,21 +15,28 @@ type reflectionModel struct {
 	gorm.Model
 	SprintID uint   `gorm:"column:sprint_id"`
 	Author   string `gorm:"column:author"`
-	Content  string `gorm:"column:content"`
+	Answers  string `gorm:"column:answers;type:jsonb"`
 }
 
 func (reflectionModel) TableName() string {
 	return "sprint_reflections"
 }
 
-func (m *reflectionModel) toDomain() domain.SprintReflection {
+func (m *reflectionModel) toDomain() (domain.SprintReflection, error) {
+	answers := map[string]string{}
+	if m.Answers != "" {
+		if err := json.Unmarshal([]byte(m.Answers), &answers); err != nil {
+			return domain.SprintReflection{}, fmt.Errorf("decode reflection answers: %w", err)
+		}
+	}
+
 	return domain.SprintReflection{
 		ID:        strconv.FormatUint(uint64(m.ID), 10),
 		SprintID:  strconv.FormatUint(uint64(m.SprintID), 10),
 		Author:    m.Author,
-		Content:   m.Content,
+		Answers:   answers,
 		CreatedAt: m.CreatedAt,
-	}
+	}, nil
 }
 
 type ReflectionRepository struct {
@@ -62,7 +70,11 @@ func (r *ReflectionRepository) ListBySprintID(
 
 	reflections := make([]domain.SprintReflection, 0, len(models))
 	for _, model := range models {
-		reflections = append(reflections, model.toDomain())
+		reflection, err := model.toDomain()
+		if err != nil {
+			return nil, err
+		}
+		reflections = append(reflections, reflection)
 	}
 
 	return reflections, nil
