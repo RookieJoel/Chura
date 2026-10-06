@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/RookieJoel/Chura/backend/internal/adapter/db"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/exporter"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/metrics"
 	memory "github.com/RookieJoel/Chura/backend/internal/adapter/db/postgres/repository"
 	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc"
 	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem"
@@ -62,8 +64,20 @@ func main() {
 		sprintService,
 	)
 
+	reflectionRepository := memory.NewReflectionRepository(connections.Postgres)
+
+	analyticsService := service.NewAnalyticsService(
+		sprintRepository,
+		reflectionRepository,
+		metrics.NewMockWorkSummaryProvider(),
+		exporter.NewCSVExporter(),
+	)
+
+	analyticsHandler := http.NewAnalyticsHandler(analyticsService)
+
 	app := http.NewRouter(
 		sprintHandler,
+		analyticsHandler,
 		frontendURL,
 	)
 

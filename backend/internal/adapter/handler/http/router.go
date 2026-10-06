@@ -4,6 +4,7 @@ import "github.com/gofiber/fiber/v2"
 
 func NewRouter(
 	sprintHandler *SprintHandler,
+	analyticsHandler *AnalyticsHandler,
 	frontendURL string,
 ) *fiber.App {
 
@@ -41,6 +42,10 @@ func NewRouter(
 	api.Get("/sprints/:id", sprintHandler.Get)
 	api.Put("/sprints/:id", sprintHandler.Update)
 	api.Delete("/sprints/:id", sprintHandler.Delete)
+
+	api.Get("/sprints/:id/reflections", analyticsHandler.ListReflections)
+	api.Get("/sprints/:id/review-summary", analyticsHandler.ReviewSummary)
+	api.Get("/sprints/:id/review-summary/export", analyticsHandler.ExportReport)
 
 	return app
 }
