@@ -1,4 +1,4 @@
-package driven
+package out
 
 type NotificationRecipientRepository interface {
 	GetEmailByUserID(userID string) (string, error)

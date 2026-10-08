@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
-	"github.com/RookieJoel/Chura/backend/internal/port/driven"
+	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/google/uuid"
 )
 
 var ErrWorkItemNotFound = domain.ErrNotFound
 
 type WorkItemService struct {
-	repository driven.WorkItemRepository
+	repository out.WorkItemRepository
 	notifier   SprintNotifier
 }
 
@@ -22,12 +22,12 @@ type SprintNotifier interface {
 	SendSprintFinishedNotifications(sprintID string, reporterIDs []string) error
 }
 
-func NewWorkItemService(repository driven.WorkItemRepository) *WorkItemService {
+func NewWorkItemService(repository out.WorkItemRepository) *WorkItemService {
 	return &WorkItemService{repository: repository}
 }
 
 func NewWorkItemServiceWithNotifier(
-	repository driven.WorkItemRepository,
+	repository out.WorkItemRepository,
 	notifier SprintNotifier,
 ) *WorkItemService {
 	return &WorkItemService{

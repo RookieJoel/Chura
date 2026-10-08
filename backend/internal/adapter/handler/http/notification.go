@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/RookieJoel/Chura/backend/internal/port/driving"
+	"github.com/RookieJoel/Chura/backend/internal/port/in"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
 )
@@ -20,7 +20,7 @@ type notificationResponse struct {
 	Error     string `json:"error,omitempty"`
 }
 
-func RegisterNotificationWebSocket(app *fiber.App, service driving.NotificationService) {
+func RegisterNotificationWebSocket(app *fiber.App, service in.NotificationService) {
 	app.Use("/ws/notifications", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
 			return c.Next()
@@ -42,7 +42,7 @@ func RegisterNotificationWebSocket(app *fiber.App, service driving.NotificationS
 }
 
 func handleNotificationMessage(
-	service driving.NotificationService,
+	service in.NotificationService,
 	message notificationMessage,
 ) notificationResponse {
 	if strings.EqualFold(strings.TrimSpace(message.Operation), "sprint_finished") {

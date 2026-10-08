@@ -2,7 +2,7 @@ import { comments } from "@/lib/mock-data";
 import type { WorkItem, WorkItemComment, WorkItemType, WorkItemStatus, Priority } from "@/types/work-item";
 
 const WORK_ITEMS_RPC_URL =
-  process.env.NEXT_PUBLIC_WORK_ITEM_RPC_URL ?? "ws://localhost:8080/ws/work-items";
+  process.env.NEXT_PUBLIC_WORK_ITEM_RPC_URL ?? "ws://127.0.0.1:8080/ws/work-items";
 const DEFAULT_PROJECT_ID =
   process.env.NEXT_PUBLIC_CHURA_PROJECT_ID ?? "project-1";
 const RPC_TIMEOUT_MS = 10_000;

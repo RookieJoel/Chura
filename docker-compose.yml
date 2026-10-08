@@ -1,0 +1,46 @@
+services:
+  db:
+    image: mongo:8
+    container_name: chura-mongo
+    environment:
+      MONGO_INITDB_DATABASE: chura
+    ports:
+      - "27017:27017"
+    volumes:
+      - chura-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping').ok\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chura-api
+    environment:
+      MONGODB_URI: mongodb://db:27017
+      MONGODB_DATABASE: chura
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+      - "9000:9000"
+
+  mongo-express:
+    image: mongo-express:1
+    container_name: chura-mongo-express
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://db:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  chura-mongo-data:

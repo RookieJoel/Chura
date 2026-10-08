@@ -4,19 +4,19 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/RookieJoel/Chura/backend/internal/port/driven"
+	"github.com/RookieJoel/Chura/backend/internal/port/out"
 )
 
 type NotificationService struct {
-	recipients driven.NotificationRecipientRepository
-	email      driven.EmailSender
+	recipients out.NotificationRecipientRepository
+	email      out.EmailSender
 }
 
 const sprintFinishedSubject = "Sprint finished"
 
 func NewNotificationService(
-	recipients driven.NotificationRecipientRepository,
-	email driven.EmailSender,
+	recipients out.NotificationRecipientRepository,
+	email out.EmailSender,
 ) *NotificationService {
 	return &NotificationService{
 		recipients: recipients,

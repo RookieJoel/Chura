@@ -1,4 +1,4 @@
-**ADR-004: Backend Architecture Pattern**
+**ADR-005: Backend Architecture Pattern**
 
 | Title | Backend Architecture Pattern |
 | :---- | :---- |

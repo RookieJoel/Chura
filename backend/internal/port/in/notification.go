@@ -1,4 +1,4 @@
-package driving
+package in
 
 type NotificationService interface {
 	SendToReporter(reporterID, subject, body string) error
