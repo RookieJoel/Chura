@@ -30,6 +30,7 @@ const (
 type WorkItem struct {
 	ID          string
 	ProjectID   string
+	SprintID    string
 	Title       string
 	Description string
 	Type        WorkItemType

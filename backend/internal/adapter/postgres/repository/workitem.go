@@ -44,6 +44,18 @@ func (repository *WorkItemRepository) List(projectID string) ([]domain.WorkItem,
 	return items, nil
 }
 
+func (repository *WorkItemRepository) ListBySprint(sprintID string) ([]domain.WorkItem, error) {
+	repository.mu.RLock()
+	defer repository.mu.RUnlock()
+	items := make([]domain.WorkItem, 0)
+	for _, item := range repository.items {
+		if item.SprintID == sprintID {
+			items = append(items, item)
+		}
+	}
+	return items, nil
+}
+
 func (repository *WorkItemRepository) Update(item domain.WorkItem) (domain.WorkItem, error) {
 	repository.mu.Lock()
 	defer repository.mu.Unlock()
