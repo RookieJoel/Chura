@@ -147,6 +147,54 @@ func TestWorkItemServicePublishesSprintFinishedEvent(t *testing.T) {
 	}
 }
 
+func TestWorkItemServicePublishesWorkItemChangeEvents(t *testing.T) {
+	publisher := &eventPublisher{}
+	repository := memory.NewWorkItemRepository()
+	workItemService := service.NewWorkItemServiceWithPublisher(repository, publisher)
+
+	item := validWorkItem()
+	item.Status = domain.WorkItemStatusInProgress
+	item.AssigneeID = "assignee-old"
+	created, err := workItemService.CreateWorkItem(item)
+	if err != nil {
+		t.Fatalf("create work item: %v", err)
+	}
+
+	created.Status = domain.WorkItemStatusReview
+	created.AssigneeID = "assignee-new"
+	if _, err := workItemService.UpdateWorkItem(created); err != nil {
+		t.Fatalf("update work item: %v", err)
+	}
+
+	if len(publisher.events) != 2 {
+		t.Fatalf("expected status and assignment events, got %#v", publisher.events)
+	}
+	if publisher.events[0].topic != "workitem.status_changed" {
+		t.Fatalf("expected status event, got %q", publisher.events[0].topic)
+	}
+	if publisher.events[1].topic != "workitem.assigned" {
+		t.Fatalf("expected assignment event, got %q", publisher.events[1].topic)
+	}
+
+	var statusEvent map[string]string
+	if err := json.Unmarshal(publisher.events[0].payload, &statusEvent); err != nil {
+		t.Fatalf("decode status event: %v", err)
+	}
+	if statusEvent["old_status"] != string(domain.WorkItemStatusInProgress) ||
+		statusEvent["new_status"] != string(domain.WorkItemStatusReview) {
+		t.Fatalf("unexpected status event: %#v", statusEvent)
+	}
+
+	var assignmentEvent map[string]string
+	if err := json.Unmarshal(publisher.events[1].payload, &assignmentEvent); err != nil {
+		t.Fatalf("decode assignment event: %v", err)
+	}
+	if assignmentEvent["previous_assignee_id"] != "assignee-old" ||
+		assignmentEvent["assignee_id"] != "assignee-new" {
+		t.Fatalf("unexpected assignment event: %#v", assignmentEvent)
+	}
+}
+
 func TestWorkItemServiceChecksSprintBeforeAndAfterAllItemsAreDone(t *testing.T) {
 	notifier := &sprintNotifier{}
 	workItemService := service.NewWorkItemServiceWithNotifier(

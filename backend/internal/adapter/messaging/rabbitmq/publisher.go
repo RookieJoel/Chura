@@ -6,6 +6,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+const EventsExchange = "chura.events"
 const SprintFinishedTopic = "sprint.finished"
 
 type Publisher struct {
@@ -17,7 +18,7 @@ func NewPublisher(connection *Connection) (*Publisher, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := channel.ExchangeDeclare(SprintFinishedTopic, "fanout", true, false, false, false, nil); err != nil {
+	if err := channel.ExchangeDeclare(EventsExchange, "topic", true, false, false, false, nil); err != nil {
 		_ = channel.Close()
 		return nil, fmt.Errorf("declare rabbitmq exchange: %w", err)
 	}
@@ -25,7 +26,7 @@ func NewPublisher(connection *Connection) (*Publisher, error) {
 }
 
 func (publisher *Publisher) Publish(topic string, payload []byte) error {
-	if err := publisher.channel.Publish(topic, "", false, false, amqp.Publishing{
+	if err := publisher.channel.Publish(EventsExchange, topic, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        payload,
 	}); err != nil {

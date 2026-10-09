@@ -86,7 +86,7 @@ func main() {
 	)
 	rabbitURL := os.Getenv("RABBITMQ_URL")
 	if rabbitURL == "" {
-		rabbitURL = "amqp://chura_dev:change_me_dev@localhost:5672/"
+		log.Fatal("RABBITMQ_URL is not set")
 	}
 	rabbitConnection, err := rabbitmq.Connect(rabbitURL)
 	if err != nil {

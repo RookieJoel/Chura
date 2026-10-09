@@ -25,8 +25,12 @@ func NewNotificationService(
 }
 
 func (service *NotificationService) SendToReporter(reporterID, subject, body string) error {
-	if strings.TrimSpace(reporterID) == "" {
-		return errors.New("reporter_id is required")
+	return service.SendWorkItemNotification(reporterID, subject, body)
+}
+
+func (service *NotificationService) SendWorkItemNotification(userID, subject, body string) error {
+	if strings.TrimSpace(userID) == "" {
+		return errors.New("user_id is required")
 	}
 	if strings.TrimSpace(subject) == "" {
 		return errors.New("subject is required")
@@ -35,7 +39,7 @@ func (service *NotificationService) SendToReporter(reporterID, subject, body str
 		return errors.New("body is required")
 	}
 
-	email, err := service.recipients.GetEmailByUserID(reporterID)
+	email, err := service.recipients.GetEmailByUserID(userID)
 	if err != nil {
 		return err
 	}

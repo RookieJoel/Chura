@@ -28,20 +28,20 @@ const (
 )
 
 type WorkItem struct {
-	ID          string
-	ProjectID   string
-	SprintID    string
-	Title       string
-	Description string
-	Type        WorkItemType
-	Status      WorkItemStatus
-	Priority    WorkItemPriority
-	AssigneeID  string
-	ReporterID  string
-	StoryPoints int32
-	Features    map[string]any
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          string           `json:"id,omitempty"`
+	ProjectID   string           `json:"project_id,omitempty"`
+	SprintID    string           `json:"sprint_id,omitempty"`
+	Title       string           `json:"title,omitempty"`
+	Description string           `json:"description,omitempty"`
+	Type        WorkItemType     `json:"type,omitempty"`
+	Status      WorkItemStatus   `json:"status,omitempty"`
+	Priority    WorkItemPriority `json:"priority,omitempty"`
+	AssigneeID  string           `json:"assignee_id,omitempty"`
+	ReporterID  string           `json:"reporter_id,omitempty"`
+	StoryPoints int32            `json:"story_points,omitempty"`
+	Features    map[string]any   `json:"features,omitempty"`
+	CreatedAt   time.Time        `json:"created_at,omitempty"`
+	UpdatedAt   time.Time        `json:"updated_at,omitempty"`
 }
 
 func (item WorkItem) Validate() error {

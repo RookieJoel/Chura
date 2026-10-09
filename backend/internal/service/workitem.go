@@ -149,7 +149,53 @@ func (service *WorkItemService) UpdateWorkItem(item domain.WorkItem) (domain.Wor
 		item.SprintID = existing.SprintID
 	}
 	item.UpdatedAt = time.Now().UTC()
-	return service.repository.Update(item)
+	updated, err := service.repository.Update(item)
+	if err != nil {
+		return domain.WorkItem{}, err
+	}
+	if service.publisher != nil {
+		if existing.Status != updated.Status {
+			if err := service.publishWorkItemEvent("workitem.status_changed", updated, map[string]string{
+				"old_status": string(existing.Status),
+				"new_status": string(updated.Status),
+			}); err != nil {
+				return domain.WorkItem{}, err
+			}
+		}
+		if existing.AssigneeID != updated.AssigneeID {
+			eventType := "workitem.assigned"
+			if strings.TrimSpace(updated.AssigneeID) == "" {
+				eventType = "workitem.unassigned"
+			}
+			if err := service.publishWorkItemEvent(eventType, updated, map[string]string{
+				"previous_assignee_id": existing.AssigneeID,
+			}); err != nil {
+				return domain.WorkItem{}, err
+			}
+		}
+	}
+	return updated, nil
+}
+
+func (service *WorkItemService) publishWorkItemEvent(eventType string, item domain.WorkItem, fields map[string]string) error {
+	event := map[string]any{
+		"event_type":   eventType,
+		"work_item_id": item.ID,
+		"title":        item.Title,
+		"reporter_id":  item.ReporterID,
+		"assignee_id":  item.AssigneeID,
+	}
+	for key, value := range fields {
+		event[key] = value
+	}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("encode %s event: %w", eventType, err)
+	}
+	if err := service.publisher.Publish(eventType, payload); err != nil {
+		return fmt.Errorf("publish %s event: %w", eventType, err)
+	}
+	return nil
 }
 
 func (service *WorkItemService) DeleteWorkItem(id string) error {
