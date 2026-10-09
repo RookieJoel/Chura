@@ -8,6 +8,7 @@ type WorkItemRepository interface {
 	Create(item domain.WorkItem) (domain.WorkItem, error)
 	Get(id string) (domain.WorkItem, error)
 	List(projectID string) ([]domain.WorkItem, error)
+	ListBySprint(sprintID string) ([]domain.WorkItem, error)
 	Update(item domain.WorkItem) (domain.WorkItem, error)
 	Delete(id string) error
 }
