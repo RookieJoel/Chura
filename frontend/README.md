@@ -1,6 +1,67 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+## Run the project
+
+Start the services in this order from the repository root:
+
+### 1. Start Keycloak
+
+Keycloak provides authentication for the frontend and backend. Start it
+first so that the `chura-keycloak` Docker network exists before the Agile
+Execution service starts.
+
+```bash
+docker compose -f deploy/docker-compose.identity.yml up -d
+```
+
+Wait until the Keycloak container is healthy at
+[http://localhost:8080](http://localhost:8080).
+
+The imported realm is `chura`. The default development users are:
+
+```text
+Username: jojo
+Password: test1234
+
+Username: tonnam
+Password: test1234
+```
+
+### 2. Start the Agile Execution services
+
+This starts the backend API, PostgreSQL, MongoDB, migrations, and the
+WorkItem WebSocket endpoint.
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d --build
+```
+
+The backend API is available at
+[http://localhost:8083](http://localhost:8083), and the WorkItem WebSocket is
+available at `ws://localhost:8083/ws/work-items`.
+
+### 3. Start the frontend
+
+Install frontend dependencies if needed, then start Next.js:
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). Opening a protected page
+automatically starts the Keycloak login flow. After signing in, the frontend
+verifies the user through the backend `/api/v1/whoami` endpoint.
+
+To stop the services:
+
+```bash
+docker compose -f deploy/docker-compose.yml down
+docker compose -f deploy/docker-compose.identity.yml down
+```
+
+## Frontend development
 
 First, run the development server:
 
