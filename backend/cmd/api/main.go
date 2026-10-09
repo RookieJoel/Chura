@@ -5,14 +5,17 @@ import (
 	"net"
 	"os"
 
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/db"
 	memory "github.com/RookieJoel/Chura/backend/internal/adapter/db/postgres/repository"
 
 	emailadapter "github.com/RookieJoel/Chura/backend/internal/adapter/email"
 	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc"
 	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
 	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/messaging/rabbitmq"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/middleware"
 	notificationmemory "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
 	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/RookieJoel/Chura/backend/internal/service"
@@ -44,12 +47,17 @@ func main() {
 		port = "8080"
 	}
 
-	postgresDB, err := db.ConnectPostgresDB(databaseURL)
+	cfg, err := loadConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	mongoConnection, err := db.ConnectMongoDB()
+	postgresDB, err := db.ConnectPostgresDB(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mongoConnection, err := db.ConnectMongoDB(cfg.MongoURI, cfg.MongoDatabase)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -67,9 +75,20 @@ func main() {
 		sprintService,
 	)
 
-	app := workitemhttp.NewRouter(
+	authHandler := http.NewAuthHandler()
+
+	jwks, err := keyfunc.NewDefault([]string{cfg.KeycloakJWKSURL})
+	if err != nil {
+		log.Fatalf("Failed to initialize JWKS: %v", err)
+	}
+
+	authMiddleware := middleware.KeycloakAuth(jwks.Keyfunc)
+
+	app := http.NewRouter(
 		sprintHandler,
-		frontendURL,
+		authHandler,
+		cfg.FrontendURL,
+		authMiddleware,
 	)
 
 	var workItemRepository out.WorkItemRepository = connections.Mongo.WorkItemsrepository
@@ -133,13 +152,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	workitemhttp.RegisterWorkItemWebSocket(app, workitemgrpc.NewWorkItemGateway(grpcConnection))
+	http.RegisterWorkItemWebSocket(app, workitemgrpc.NewWorkItemGateway(grpcConnection))
 
 	workitemhttp.RegisterNotificationWebSocket(app, notificationService)
 
 	log.Printf("server running on :%s", port)
+	log.Printf("server running on :%s", cfg.Port)
 
-	if err := app.Listen(":" + port); err != nil {
+	if err := app.Listen(":" + cfg.Port); err != nil {
 		log.Fatal(err)
 	}
 }
