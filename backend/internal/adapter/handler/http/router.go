@@ -4,7 +4,9 @@ import "github.com/gofiber/fiber/v2"
 
 func NewRouter(
 	sprintHandler *SprintHandler,
+	authHandler *AuthHandler,
 	frontendURL string,
+	authMiddleware fiber.Handler,
 ) *fiber.App {
 
 	app := fiber.New()
@@ -12,7 +14,7 @@ func NewRouter(
 	app.Use(func(c *fiber.Ctx) error {
 		c.Set("Access-Control-Allow-Origin", frontendURL)
 		c.Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-		c.Set("Access-Control-Allow-Headers", "Content-Type")
+		c.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if c.Method() == fiber.MethodOptions {
 			return c.SendStatus(fiber.StatusNoContent)
@@ -41,6 +43,8 @@ func NewRouter(
 	api.Get("/sprints/:id", sprintHandler.Get)
 	api.Put("/sprints/:id", sprintHandler.Update)
 	api.Delete("/sprints/:id", sprintHandler.Delete)
+
+	api.Get("/whoami", authMiddleware, authHandler.WhoAmI)
 
 	return app
 }
