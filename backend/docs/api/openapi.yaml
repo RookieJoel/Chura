@@ -64,6 +64,7 @@ paths:
         "400": { $ref: "#/components/responses/InvalidInput" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/projects/{projectId}:
     get:
       summary: Retrieve Project data (retrieveProjectData). Members and Auditors only; other Team Members get 404.
@@ -80,6 +81,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/projects/{projectId}/members:
     post:
       summary: Add a member with the Template's default role (addProjectMember). Project members only.
@@ -106,6 +108,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/projects/{projectId}/members/{userId}/role:
     put:
       summary: Assign a Project Role to a member (assignProjectRole). Project members only. The last holder of the creator role cannot be moved off it.
@@ -133,6 +136,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/projects/{projectId}/work-items/validate:
     post:
       summary: Validate Work Item attributes against the Project's Template (validateWorkItemAttributes). Persists nothing; valid=false is still 200.
@@ -155,6 +159,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "413": { description: Request body larger than 1 MiB }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/sprints:
     post:
       summary: Create a Sprint inside a Project (createSprint). Team Member who belongs to the Project only.
@@ -174,6 +179,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
     get:
       summary: List the Sprints of one Project (listSprints). Project members and Auditors only; other Team Members get 404.
       operationId: listSprints
@@ -195,6 +201,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/sprints/{sprintId}:
     parameters:
       - { name: sprintId, in: path, required: true, schema: { type: string, example: "7" } }
@@ -210,6 +217,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
     put:
       summary: Update a Sprint (updateSprint). Team Members who belong to its Project only; project_id is immutable and ignored.
       operationId: updateSprint
@@ -228,6 +236,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
     delete:
       summary: Delete a Sprint (deleteSprint). Team Members who belong to its Project only.
       operationId: deleteSprint
@@ -237,6 +246,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/whoami:
     get:
       summary: Identity of the authenticated caller
@@ -290,6 +300,11 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
     NotFound:
       description: Not found, or a Project (or its Sprint) the Team Member does not belong to. `error` is "not found".
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ServiceUnavailable:
+      description: The identity provider (Keycloak) holding Project membership could not give a definite answer. `error` is "service unavailable".
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -366,11 +381,12 @@ components:
         template_id: { type: string }
     Member:
       type: object
-      required: [user_id, role, added_at]
+      required: [user_id, email, name, role]
       properties:
         user_id: { type: string }
+        email: { type: string }
+        name: { type: string, description: Trimmed first and last name, falling back to the username }
         role: { type: string }
-        added_at: { type: string, format: date-time }
     Project:
       type: object
       required: [id, name, description, template_id, mode, created_by, members, created_at, updated_at]

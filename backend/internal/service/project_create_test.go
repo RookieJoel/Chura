@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -15,16 +16,21 @@ import (
 
 var fixedNow = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 
-func newProjectService(repo *fakeProjectRepo) *service.ProjectConfigurationService {
-	return service.NewProjectConfigurationService(repo,
+func newProjectService(repo *fakeProjectRepo, dir *fakeDirectory) *service.ProjectConfigurationService {
+	return service.NewProjectConfigurationService(repo, dir,
 		service.WithIDGenerator(func() string { return "11111111-1111-4111-8111-111111111111" }),
 		service.WithClock(func() time.Time { return fixedNow }),
 	)
 }
 
-func TestCreateProjectBoard_SETemplate_CreatorBecomesProductOwner(t *testing.T) {
+func newProjectEnv() (*fakeProjectRepo, *fakeDirectory, *service.ProjectConfigurationService) {
 	repo := newFakeProjectRepo()
-	svc := newProjectService(repo)
+	dir := newFakeDirectory(repo.log)
+	return repo, dir, newProjectService(repo, dir)
+}
+
+func TestCreateProjectBoard_SETemplate_CreatorBecomesProductOwner(t *testing.T) {
+	repo, _, svc := newProjectEnv()
 
 	got, err := svc.CreateProjectBoard(context.Background(), teamMember, in.CreateProjectInput{
 		Name: "  Chura  ", Description: "  agile board \n", TemplateID: "se",
@@ -35,21 +41,21 @@ func TestCreateProjectBoard_SETemplate_CreatorBecomesProductOwner(t *testing.T) 
 
 	want := &domain.Project{
 		ID: "11111111-1111-4111-8111-111111111111", Name: "Chura", Description: "agile board",
-		TemplateID: "se", Mode: "se", CreatedBy: "u1",
-		Members:   []domain.Member{{UserID: "u1", Role: "product_owner", AddedAt: fixedNow}},
+		TemplateID: "se", Mode: "se", CreatedBy: "u1", GroupID: "group-1",
+		Members:   []domain.Member{{UserID: "u1", Email: "u1@example.com", Role: "product_owner"}},
 		CreatedAt: fixedNow, UpdatedAt: fixedNow,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("project mismatch\n got: %+v\nwant: %+v", got, want)
 	}
 	stored, err := repo.GetByID(context.Background(), want.ID)
-	if err != nil || !reflect.DeepEqual(stored, want) {
-		t.Fatalf("not persisted as returned: %+v, %v", stored, err)
+	if err != nil || stored.GroupID != "group-1" || stored.Name != "Chura" {
+		t.Fatalf("row not persisted with group id: %+v, %v", stored, err)
 	}
 }
 
 func TestCreateProjectBoard_GeneralTemplate_CreatorBecomesOwner(t *testing.T) {
-	svc := newProjectService(newFakeProjectRepo())
+	_, _, svc := newProjectEnv()
 
 	got, err := svc.CreateProjectBoard(context.Background(), teamMember, in.CreateProjectInput{
 		Name: "Thesis", TemplateID: "general",
@@ -61,15 +67,62 @@ func TestCreateProjectBoard_GeneralTemplate_CreatorBecomesOwner(t *testing.T) {
 	if got.Mode != "general" || got.TemplateID != "general" || got.Description != "" {
 		t.Fatalf("unexpected project: %+v", got)
 	}
-	wantMembers := []domain.Member{{UserID: "u1", Role: "owner", AddedAt: fixedNow}}
+	wantMembers := []domain.Member{{UserID: "u1", Email: "u1@example.com", Role: "owner"}}
 	if !reflect.DeepEqual(got.Members, wantMembers) {
 		t.Fatalf("members = %+v, want %+v", got.Members, wantMembers)
 	}
 }
 
+func TestCreateProjectBoard_WritesInOrderAndUndoesInReverseOnFailure(t *testing.T) {
+	errKeycloak := fmt.Errorf("keycloak down: %w", domain.ErrUnavailable)
+	errDB := errors.New("db down")
+	const (
+		create   = "CreateProjectGroup(11111111-1111-4111-8111-111111111111)"
+		add      = "AddMember(group-1,u1,product_owner)"
+		repoCall = "repo.Create(11111111-1111-4111-8111-111111111111)"
+		remove   = "RemoveMember(group-1,u1)"
+		del      = "DeleteProjectGroup(group-1)"
+	)
+	cases := []struct {
+		name      string
+		dirErrs   map[string]error
+		repoErr   error
+		wantCalls []string
+		wantErr   error // nil means success
+	}{
+		{"success", nil, nil, []string{create, add, repoCall}, nil},
+		{"group creation fails", map[string]error{"CreateProjectGroup": errKeycloak}, nil, []string{create}, domain.ErrUnavailable},
+		{"member add fails", map[string]error{"AddMember": errKeycloak}, nil, []string{create, add, del}, domain.ErrUnavailable},
+		{"row insert fails", nil, errDB, []string{create, add, repoCall, remove, del}, errDB},
+		{"row insert fails and undo fails", map[string]error{"RemoveMember": errKeycloak, "DeleteProjectGroup": errKeycloak}, errDB, []string{create, add, repoCall, remove, del}, errDB},
+		{"member add fails and undo fails", map[string]error{"AddMember": errKeycloak, "DeleteProjectGroup": errors.New("also down")}, nil, []string{create, add, del}, domain.ErrUnavailable},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, dir, svc := newProjectEnv()
+			for method, err := range tc.dirErrs {
+				dir.errs[method] = err
+			}
+			repo.createErr = tc.repoErr
+
+			_, err := svc.CreateProjectBoard(context.Background(), teamMember, in.CreateProjectInput{Name: "Chura", TemplateID: "se"})
+
+			if tc.wantErr == nil && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantErr != nil && !errors.Is(err, tc.wantErr) {
+				t.Fatalf("err = %v, want it to match %v", err, tc.wantErr)
+			}
+			if !reflect.DeepEqual(repo.log.calls, tc.wantCalls) {
+				t.Fatalf("calls = %v, want %v", repo.log.calls, tc.wantCalls)
+			}
+		})
+	}
+}
+
 func createInvalid(t *testing.T, repo *fakeProjectRepo, input in.CreateProjectInput) []domain.Violation {
 	t.Helper()
-	_, err := newProjectService(repo).CreateProjectBoard(context.Background(), teamMember, input)
+	_, err := newProjectService(repo, newFakeDirectory(repo.log)).CreateProjectBoard(context.Background(), teamMember, input)
 	if !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("want ErrInvalidInput, got %v", err)
 	}
@@ -77,8 +130,8 @@ func createInvalid(t *testing.T, repo *fakeProjectRepo, input in.CreateProjectIn
 	if !errors.As(err, &invalid) {
 		t.Fatalf("want *InvalidInputError, got %T", err)
 	}
-	if len(repo.projects) != 0 {
-		t.Fatalf("invalid input must not persist anything")
+	if len(repo.log.calls) != 0 {
+		t.Fatalf("invalid input must not touch the repository or directory, calls = %v", repo.log.calls)
 	}
 	return invalid.Violations
 }
@@ -113,7 +166,9 @@ func TestCreateProjectBoard_NameOf101ThaiRunes_ReportsNameViolation(t *testing.T
 func TestCreateProjectBoard_NameOf100ThaiRunes_IsAccepted(t *testing.T) {
 	name := strings.Repeat("ก", 100)
 
-	got, err := newProjectService(newFakeProjectRepo()).CreateProjectBoard(context.Background(), teamMember,
+	_, _, svc := newProjectEnv()
+
+	got, err := svc.CreateProjectBoard(context.Background(), teamMember,
 		in.CreateProjectInput{Name: name, TemplateID: "se"})
 	if err != nil {
 		t.Fatalf("100 Thai runes (300 bytes) must be accepted: %v", err)
@@ -162,27 +217,27 @@ func TestCreateProjectBoard_Auditor_IsForbidden(t *testing.T) {
 	repo := newFakeProjectRepo()
 	auditor := domain.Actor{UserID: "a1", Email: "a1@example.com", Role: domain.SystemRoleAuditor}
 
-	_, err := newProjectService(repo).CreateProjectBoard(context.Background(), auditor,
+	_, err := newProjectService(repo, newFakeDirectory(repo.log)).CreateProjectBoard(context.Background(), auditor,
 		in.CreateProjectInput{Name: "ok", TemplateID: "se"})
 
 	if !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("want ErrForbidden, got %v", err)
 	}
-	if len(repo.projects) != 0 {
-		t.Fatal("forbidden create must not persist")
+	if len(repo.log.calls) != 0 {
+		t.Fatalf("forbidden create must not touch anything, calls = %v", repo.log.calls)
 	}
 }
 
 func TestCreateProjectBoard_UnauthenticatedActor_IsRejected(t *testing.T) {
 	repo := newFakeProjectRepo()
 
-	_, err := newProjectService(repo).CreateProjectBoard(context.Background(), domain.Actor{},
+	_, err := newProjectService(repo, newFakeDirectory(repo.log)).CreateProjectBoard(context.Background(), domain.Actor{},
 		in.CreateProjectInput{Name: "ok", TemplateID: "se"})
 
 	if !errors.Is(err, domain.ErrUnauthenticated) {
 		t.Fatalf("want ErrUnauthenticated, got %v", err)
 	}
-	if len(repo.projects) != 0 {
-		t.Fatal("unauthenticated create must not persist")
+	if len(repo.log.calls) != 0 {
+		t.Fatalf("unauthenticated create must not touch anything, calls = %v", repo.log.calls)
 	}
 }

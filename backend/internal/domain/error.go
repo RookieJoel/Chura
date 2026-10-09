@@ -11,6 +11,7 @@ var (
 	ErrUnauthenticated = errors.New("unauthenticated")
 	ErrForbidden       = errors.New("forbidden")
 	ErrConflict        = errors.New("conflict")
+	ErrUnavailable     = errors.New("unavailable")
 )
 
 // Violation describes one invalid field.

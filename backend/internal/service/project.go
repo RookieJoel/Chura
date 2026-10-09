@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -16,9 +17,10 @@ import (
 )
 
 type ProjectConfigurationService struct {
-	repo  out.ProjectRepository
-	newID func() string
-	now   func() time.Time
+	repo      out.ProjectRepository
+	directory out.ProjectDirectory
+	newID     func() string
+	now       func() time.Time
 }
 
 var (
@@ -37,11 +39,12 @@ func WithClock(now func() time.Time) ProjectOption {
 	return func(s *ProjectConfigurationService) { s.now = now }
 }
 
-func NewProjectConfigurationService(repo out.ProjectRepository, opts ...ProjectOption) *ProjectConfigurationService {
+func NewProjectConfigurationService(repo out.ProjectRepository, directory out.ProjectDirectory, opts ...ProjectOption) *ProjectConfigurationService {
 	s := &ProjectConfigurationService{
-		repo:  repo,
-		newID: uuid.NewString,
-		now:   func() time.Time { return time.Now().UTC() },
+		repo:      repo,
+		directory: directory,
+		newID:     uuid.NewString,
+		now:       func() time.Time { return time.Now().UTC() },
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -83,14 +86,40 @@ func (s *ProjectConfigurationService) CreateProjectBoard(ctx context.Context, ac
 		TemplateID:  template.ID,
 		Mode:        template.Mode,
 		CreatedBy:   actor.UserID,
-		Members:     []domain.Member{{UserID: actor.UserID, Role: template.CreatorRole, AddedAt: now}},
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	if err := s.repo.Create(ctx, project); err != nil {
+	// Keycloak has no transactions: write in order and undo in reverse on failure.
+	groupID, err := s.directory.CreateProjectGroup(ctx, project.ID)
+	if err != nil {
 		return nil, fmt.Errorf("create project: %w", err)
 	}
+	project.GroupID = groupID
+	if err := s.directory.AddMember(ctx, groupID, project.ID, actor.UserID, template.CreatorRole); err != nil {
+		s.undoCreate(ctx, project, false)
+		return nil, fmt.Errorf("create project: %w", err)
+	}
+	if err := s.repo.Create(ctx, project); err != nil {
+		s.undoCreate(ctx, project, true)
+		return nil, fmt.Errorf("create project: %w", err)
+	}
+	project.Members = []domain.Member{{UserID: actor.UserID, Email: actor.Email, Role: template.CreatorRole}}
 	return project, nil
+}
+
+// undoCreate best-effort reverts the directory writes of a failed create.
+// Failures are logged for manual clean-up and never returned: the caller must
+// see the original error.
+func (s *ProjectConfigurationService) undoCreate(ctx context.Context, project *domain.Project, memberAdded bool) {
+	ctx = context.WithoutCancel(ctx)
+	if memberAdded {
+		if err := s.directory.RemoveMember(ctx, project.GroupID, project.ID, project.CreatedBy); err != nil {
+			slog.Error("undo create project: remove creator failed", "project_id", project.ID, "group_id", project.GroupID, "error", err)
+		}
+	}
+	if err := s.directory.DeleteProjectGroup(ctx, project.GroupID); err != nil {
+		slog.Error("undo create project: delete group failed", "project_id", project.ID, "group_id", project.GroupID, "error", err)
+	}
 }
 
 func (s *ProjectConfigurationService) AddProjectMember(ctx context.Context, actor domain.Actor, projectID, userID string) (*domain.Project, error) {
@@ -104,18 +133,20 @@ func (s *ProjectConfigurationService) AddProjectMember(ctx context.Context, acto
 			{Field: "user_id", Message: fmt.Sprintf("user_id is required and must be at most %d characters", domain.MaxUserIDRunes)},
 		}})
 	}
-	if _, isMember := project.MemberByID(userID); isMember {
-		return nil, fmt.Errorf("add project member: user %q is already a member: %w", userID, domain.ErrConflict)
-	}
 	template, err := templateOf(project)
 	if err != nil {
 		return nil, fmt.Errorf("add project member: %w", err)
 	}
-	member := domain.Member{UserID: userID, Role: template.DefaultRole, AddedAt: s.now()}
-	if err := s.repo.AddMember(ctx, project.ID, member); err != nil {
+	if err := s.refreshMembers(ctx, project); err != nil {
 		return nil, fmt.Errorf("add project member: %w", err)
 	}
-	return s.repo.GetByID(ctx, project.ID)
+	if _, isMember := project.MemberByID(userID); isMember {
+		return nil, fmt.Errorf("add project member: user %q is already a member: %w", userID, domain.ErrConflict)
+	}
+	if err := s.directory.AddMember(ctx, project.GroupID, project.ID, userID, template.DefaultRole); err != nil {
+		return nil, fmt.Errorf("add project member: %w", err)
+	}
+	return s.loadVisible(ctx, actor, project.ID)
 }
 
 func (s *ProjectConfigurationService) AssignProjectRole(ctx context.Context, actor domain.Actor, projectID, userID string, role domain.ProjectRole) (*domain.Project, error) {
@@ -133,16 +164,31 @@ func (s *ProjectConfigurationService) AssignProjectRole(ctx context.Context, act
 		}})
 	}
 	userID = strings.TrimSpace(userID)
-	guard := keepCreatorRoleGuard(userID, role, template.CreatorRole)
-	if err := s.repo.UpdateMemberRole(ctx, project.ID, userID, role, guard); err != nil {
+	if err := s.refreshMembers(ctx, project); err != nil {
 		return nil, fmt.Errorf("assign project role: %w", err)
 	}
-	return s.repo.GetByID(ctx, project.ID)
+	if err := keepCreatorRoleGuard(userID, role, template.CreatorRole)(project.Members); err != nil {
+		return nil, fmt.Errorf("assign project role: %w", err)
+	}
+	if err := s.directory.SetMemberRole(ctx, project.ID, userID, role); err != nil {
+		return nil, fmt.Errorf("assign project role: %w", err)
+	}
+	return s.loadVisible(ctx, actor, project.ID)
 }
 
-// keepCreatorRoleGuard is evaluated by the repository against the locked,
-// current members: the target must be a member, and the last holder of the
-// creator role may not be moved off it.
+// refreshMembers replaces project.Members with the directory's current members.
+func (s *ProjectConfigurationService) refreshMembers(ctx context.Context, project *domain.Project) error {
+	members, err := s.directory.ListMembers(ctx, project.GroupID, project.ID)
+	if err != nil {
+		return fmt.Errorf("list members of project %s: %w", project.ID, err)
+	}
+	project.Members = members
+	return nil
+}
+
+// keepCreatorRoleGuard is evaluated against the current members: the target
+// must be a member, and the last holder of the creator role may not be moved
+// off it.
 func keepCreatorRoleGuard(userID string, role, creatorRole domain.ProjectRole) func([]domain.Member) error {
 	return func(members []domain.Member) error {
 		current := domain.Project{Members: members}
@@ -177,6 +223,9 @@ func (s *ProjectConfigurationService) loadVisible(ctx context.Context, actor dom
 	}
 	project, err := s.repo.GetByID(ctx, projectID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.refreshMembers(ctx, project); err != nil {
 		return nil, err
 	}
 	if actor.Role == domain.SystemRoleAuditor {

@@ -33,6 +33,7 @@ var publicErrors = []struct {
 	{domain.ErrForbidden, fiber.StatusForbidden, "forbidden"},
 	{domain.ErrNotFound, fiber.StatusNotFound, "not found"},
 	{domain.ErrConflict, fiber.StatusConflict, "conflict"},
+	{domain.ErrUnavailable, fiber.StatusServiceUnavailable, "service unavailable"},
 }
 
 // writeError is the single mapping from domain errors to HTTP responses.

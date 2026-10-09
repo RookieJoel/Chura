@@ -11,6 +11,7 @@ const (
 	MaxProjectNameRunes        = 100
 	MaxProjectDescriptionRunes = 2000
 	MaxUserIDRunes             = 100
+	MaxEmailRunes              = 254
 
 	// Caps on validateWorkItemAttributes input, applied in every Template.
 	MaxWorkItemTitleRunes       = 200
@@ -22,21 +23,33 @@ const (
 type ProjectRole string
 
 type Project struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	TemplateID  string    `json:"template_id"`
-	Mode        Mode      `json:"mode"`
-	CreatedBy   string    `json:"created_by"`
-	Members     []Member  `json:"members"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	TemplateID  string   `json:"template_id"`
+	Mode        Mode     `json:"mode"`
+	CreatedBy   string   `json:"created_by"`
+	Members     []Member `json:"members"`
+	// GroupID is the identity-provider group holding the members; internal only.
+	GroupID   string    `json:"-"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Member struct {
-	UserID  string      `json:"user_id"`
-	Role    ProjectRole `json:"role"`
-	AddedAt time.Time   `json:"added_at"`
+	UserID string      `json:"user_id"`
+	Email  string      `json:"email"`
+	Name   string      `json:"name"`
+	Role   ProjectRole `json:"role"`
+}
+
+// DirectoryUser is a user known to the identity provider. Role is empty when
+// the user holds no Chura role or both.
+type DirectoryUser struct {
+	ID    string
+	Email string
+	Name  string
+	Role  SystemRole
 }
 
 // ValidateProjectInput returns the chosen Template when the input is valid.

@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -15,14 +16,13 @@ import (
 var auditor = domain.Actor{UserID: "a1", Email: "a1@example.com", Role: domain.SystemRoleAuditor}
 
 // projectWithTemplate seeds a project (creator u1) from the given template.
-func projectWithTemplate(t *testing.T, templateID string) (*fakeProjectRepo, *service.ProjectConfigurationService) {
+func projectWithTemplate(t *testing.T, templateID string) (*fakeDirectory, *service.ProjectConfigurationService) {
 	t.Helper()
-	repo := newFakeProjectRepo()
-	svc := newProjectService(repo)
+	_, dir, svc := newProjectEnv()
 	if _, err := svc.CreateProjectBoard(context.Background(), teamMember, in.CreateProjectInput{Name: "Chura", TemplateID: templateID}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	return repo, svc
+	return dir, svc
 }
 
 func TestAddProjectMember_AppliesTemplateDefaultRole(t *testing.T) {
@@ -44,8 +44,8 @@ func TestAddProjectMember_AppliesTemplateDefaultRole(t *testing.T) {
 			}
 
 			want := []domain.Member{
-				{UserID: "u1", Role: tc.wantCreator, AddedAt: fixedNow},
-				{UserID: "u2", Role: tc.wantDefault, AddedAt: fixedNow},
+				{UserID: "u1", Email: "u1@example.com", Name: "User u1", Role: tc.wantCreator},
+				{UserID: "u2", Email: "u2@example.com", Name: "User u2", Role: tc.wantDefault},
 			}
 			if !reflect.DeepEqual(got.Members, want) {
 				t.Fatalf("members = %+v, want %+v", got.Members, want)
@@ -59,15 +59,15 @@ var bothTemplates = []string{"se", "general"}
 func TestAddProjectMember_Auditor_IsForbidden(t *testing.T) {
 	for _, templateID := range bothTemplates {
 		t.Run(templateID, func(t *testing.T) {
-			repo, svc := projectWithTemplate(t, templateID)
+			dir, svc := projectWithTemplate(t, templateID)
 
 			_, err := svc.AddProjectMember(context.Background(), auditor, seededProjectID, "u2")
 
 			if !errors.Is(err, domain.ErrForbidden) {
 				t.Fatalf("want ErrForbidden, got %v", err)
 			}
-			if stored, _ := repo.GetByID(context.Background(), seededProjectID); len(stored.Members) != 1 {
-				t.Fatalf("auditor must not mutate, members = %+v", stored.Members)
+			if members := dir.members["group-1"]; len(members) != 1 {
+				t.Fatalf("auditor must not mutate, members = %+v", members)
 			}
 		})
 	}
@@ -215,15 +215,15 @@ func TestAssignProjectRole_RoleNotInTemplate_ReportsViolationOnRole(t *testing.T
 func TestAssignProjectRole_TargetNotAMember_IsNotFound(t *testing.T) {
 	for templateID, roles := range templateRoles {
 		t.Run(templateID, func(t *testing.T) {
-			repo, svc := projectWithTemplate(t, templateID)
+			dir, svc := projectWithTemplate(t, templateID)
 
 			_, err := svc.AssignProjectRole(context.Background(), teamMember, seededProjectID, "ghost", roles.other)
 
 			if !errors.Is(err, domain.ErrNotFound) {
 				t.Fatalf("want ErrNotFound, got %v", err)
 			}
-			if stored, _ := repo.GetByID(context.Background(), seededProjectID); len(stored.Members) != 1 {
-				t.Fatalf("must not add members, got %+v", stored.Members)
+			if members := dir.members["group-1"]; len(members) != 1 {
+				t.Fatalf("must not add members, got %+v", members)
 			}
 		})
 	}
@@ -232,15 +232,15 @@ func TestAssignProjectRole_TargetNotAMember_IsNotFound(t *testing.T) {
 func TestAssignProjectRole_Auditor_IsForbidden(t *testing.T) {
 	for templateID, roles := range templateRoles {
 		t.Run(templateID, func(t *testing.T) {
-			repo, svc := projectWithTemplate(t, templateID)
+			dir, svc := projectWithTemplate(t, templateID)
 
 			_, err := svc.AssignProjectRole(context.Background(), auditor, seededProjectID, "u1", roles.other)
 
 			if !errors.Is(err, domain.ErrForbidden) {
 				t.Fatalf("want ErrForbidden, got %v", err)
 			}
-			if stored, _ := repo.GetByID(context.Background(), seededProjectID); stored.Members[0].Role != roles.creator {
-				t.Fatalf("auditor must not mutate, got %+v", stored.Members)
+			if members := dir.members["group-1"]; members[0].Role != roles.creator {
+				t.Fatalf("auditor must not mutate, got %+v", members)
 			}
 		})
 	}
@@ -264,15 +264,15 @@ func TestAssignProjectRole_OutsiderTeamMember_IsNotFound(t *testing.T) {
 func TestAssignProjectRole_DemotingSoleCreatorRoleHolder_IsConflict(t *testing.T) {
 	for templateID, roles := range templateRoles {
 		t.Run(templateID, func(t *testing.T) {
-			repo, svc := projectWithTemplate(t, templateID)
+			dir, svc := projectWithTemplate(t, templateID)
 
 			_, err := svc.AssignProjectRole(context.Background(), teamMember, seededProjectID, "u1", roles.other)
 
 			if !errors.Is(err, domain.ErrConflict) {
 				t.Fatalf("want ErrConflict, got %v", err)
 			}
-			if stored, _ := repo.GetByID(context.Background(), seededProjectID); stored.Members[0].Role != roles.creator {
-				t.Fatalf("role must be unchanged, got %+v", stored.Members)
+			if members := dir.members["group-1"]; members[0].Role != roles.creator {
+				t.Fatalf("role must be unchanged, got %+v", members)
 			}
 		})
 	}
@@ -349,40 +349,50 @@ func TestAssignProjectRole_TrimsUserID(t *testing.T) {
 	}
 }
 
-// A concurrent demotion of the other creator-role holder lands after the
-// service read the project; the locked re-check must still refuse.
-func TestAssignProjectRole_LastCreatorGuardIsRecheckedAtUpdateTime(t *testing.T) {
-	repo, svc := projectWithTemplate(t, "se")
-	ctx := context.Background()
-	if _, err := svc.AddProjectMember(ctx, teamMember, seededProjectID, "u2"); err != nil {
-		t.Fatalf("seed: %v", err)
+func TestMembershipWrites_DirectoryDown_IsUnavailable(t *testing.T) {
+	errKeycloak := fmt.Errorf("keycloak down: %w", domain.ErrUnavailable)
+	cases := []struct {
+		name   string
+		method string
+		call   func(svc *service.ProjectConfigurationService) error
+	}{
+		{"add: list fails", "ListMembers", func(svc *service.ProjectConfigurationService) error {
+			_, err := svc.AddProjectMember(context.Background(), teamMember, seededProjectID, "u2")
+			return err
+		}},
+		{"add: write fails", "AddMember", func(svc *service.ProjectConfigurationService) error {
+			_, err := svc.AddProjectMember(context.Background(), teamMember, seededProjectID, "u2")
+			return err
+		}},
+		{"assign: list fails", "ListMembers", func(svc *service.ProjectConfigurationService) error {
+			_, err := svc.AssignProjectRole(context.Background(), teamMember, seededProjectID, "u1", "product_owner")
+			return err
+		}},
+		{"assign: write fails", "SetMemberRole", func(svc *service.ProjectConfigurationService) error {
+			_, err := svc.AssignProjectRole(context.Background(), teamMember, seededProjectID, "u1", "product_owner")
+			return err
+		}},
 	}
-	if _, err := svc.AssignProjectRole(ctx, teamMember, seededProjectID, "u2", "product_owner"); err != nil {
-		t.Fatalf("seed promote: %v", err)
-	}
-	repo.beforeUpdate = func(r *fakeProjectRepo) {
-		p := r.projects[seededProjectID]
-		p.Members[1].Role = "developer"
-		r.projects[seededProjectID] = p
-	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir, svc := projectWithTemplate(t, "se")
+			dir.errs[tc.method] = errKeycloak
 
-	_, err := svc.AssignProjectRole(ctx, teamMember, seededProjectID, "u1", "developer")
+			err := tc.call(svc)
 
-	if !errors.Is(err, domain.ErrConflict) {
-		t.Fatalf("want ErrConflict, got %v", err)
-	}
-	if u1, _ := repo.projects[seededProjectID].MemberByID("u1"); u1.Role != "product_owner" {
-		t.Fatalf("u1 must keep product_owner, got %+v", repo.projects[seededProjectID].Members)
+			if !errors.Is(err, domain.ErrUnavailable) {
+				t.Fatalf("want ErrUnavailable, got %v", err)
+			}
+		})
 	}
 }
 
 func TestProjectOperations_UnknownStoredTemplate_IsInternalError(t *testing.T) {
 	repo := newFakeProjectRepo()
-	repo.projects[seededProjectID] = domain.Project{
-		ID: seededProjectID, TemplateID: "vanished",
-		Members: []domain.Member{{UserID: "u1", Role: "owner"}},
-	}
-	svc := newProjectService(repo)
+	dir := newFakeDirectory(repo.log)
+	repo.projects[seededProjectID] = domain.Project{ID: seededProjectID, TemplateID: "vanished", GroupID: "g"}
+	dir.members["g"] = []domain.Member{{UserID: "u1", Role: "owner"}}
+	svc := newProjectService(repo, dir)
 	ctx := context.Background()
 
 	_, addErr := svc.AddProjectMember(ctx, teamMember, seededProjectID, "u2")

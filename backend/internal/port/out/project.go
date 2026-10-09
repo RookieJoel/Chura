@@ -7,16 +7,22 @@ import (
 )
 
 type ProjectRepository interface {
-	// Create stores the project and its creator member in one transaction.
+	// Create stores the project row; membership lives in the ProjectDirectory.
 	Create(ctx context.Context, project *domain.Project) error
-	// GetByID returns the project with members ordered by added_at; domain.ErrNotFound if missing.
+	// GetByID returns the project row with Members nil; domain.ErrNotFound if missing.
 	GetByID(ctx context.Context, id string) (*domain.Project, error)
-	// AddMember returns domain.ErrConflict on duplicate and domain.ErrNotFound if the project is gone.
-	AddMember(ctx context.Context, projectID string, member domain.Member) error
-	// UpdateMemberRole atomically locks the project's members, passes them to
-	// guard (whose error aborts the change unchanged) and then updates the role.
-	// It returns domain.ErrNotFound if the user is not a member.
-	UpdateMemberRole(ctx context.Context, projectID, userID string, role domain.ProjectRole, guard func(members []domain.Member) error) error
+}
+
+// ProjectDirectory is the identity store holding Project membership and Project Role.
+// Every failure that is not a definite answer is wrapped with domain.ErrUnavailable.
+type ProjectDirectory interface {
+	CreateProjectGroup(ctx context.Context, projectID string) (groupID string, err error)
+	DeleteProjectGroup(ctx context.Context, groupID string) error
+	FindUserByEmail(ctx context.Context, email string) (domain.DirectoryUser, error) // ErrNotFound
+	ListMembers(ctx context.Context, groupID, projectID string) ([]domain.Member, error)
+	AddMember(ctx context.Context, groupID, projectID, userID string, role domain.ProjectRole) error
+	SetMemberRole(ctx context.Context, projectID, userID string, role domain.ProjectRole) error
+	RemoveMember(ctx context.Context, groupID, projectID, userID string) error // undo only
 }
 
 // ProjectGateway lets other services read a Project with the caller's visibility rules.

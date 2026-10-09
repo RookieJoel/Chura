@@ -13,7 +13,7 @@ import (
 var teamMember = domain.Actor{UserID: "u1", Email: "u1@example.com", Role: domain.SystemRoleTeamMember}
 
 func TestGetAvailableTemplates_ExposesGeneralAndSE(t *testing.T) {
-	svc := service.NewProjectConfigurationService(newFakeProjectRepo())
+	svc := service.NewProjectConfigurationService(newFakeProjectRepo(), nil)
 
 	got, err := svc.GetAvailableTemplates(context.Background(), teamMember)
 	if err != nil {
@@ -53,7 +53,7 @@ func TestGetAvailableTemplates_ExposesGeneralAndSE(t *testing.T) {
 }
 
 func TestRetrieveTemplateDefinition_ReturnsSE(t *testing.T) {
-	svc := service.NewProjectConfigurationService(newFakeProjectRepo())
+	svc := service.NewProjectConfigurationService(newFakeProjectRepo(), nil)
 
 	got, err := svc.RetrieveTemplateDefinition(context.Background(), teamMember, "se")
 	if err != nil {
@@ -66,7 +66,7 @@ func TestRetrieveTemplateDefinition_ReturnsSE(t *testing.T) {
 }
 
 func TestRetrieveTemplateDefinition_UnknownIDIsNotFound(t *testing.T) {
-	svc := service.NewProjectConfigurationService(newFakeProjectRepo())
+	svc := service.NewProjectConfigurationService(newFakeProjectRepo(), nil)
 
 	_, err := svc.RetrieveTemplateDefinition(context.Background(), teamMember, "nope")
 	if !errors.Is(err, domain.ErrNotFound) {
@@ -75,7 +75,7 @@ func TestRetrieveTemplateDefinition_UnknownIDIsNotFound(t *testing.T) {
 }
 
 func TestTemplates_UnauthenticatedActorRejected(t *testing.T) {
-	svc := service.NewProjectConfigurationService(newFakeProjectRepo())
+	svc := service.NewProjectConfigurationService(newFakeProjectRepo(), nil)
 	bad := []domain.Actor{
 		{UserID: "", Role: domain.SystemRoleTeamMember},
 		{UserID: "   ", Role: domain.SystemRoleAuditor},
@@ -92,7 +92,7 @@ func TestTemplates_UnauthenticatedActorRejected(t *testing.T) {
 }
 
 func TestTemplates_CallerMutationDoesNotAffectCatalog(t *testing.T) {
-	svc := service.NewProjectConfigurationService(newFakeProjectRepo())
+	svc := service.NewProjectConfigurationService(newFakeProjectRepo(), nil)
 
 	first, _ := svc.RetrieveTemplateDefinition(context.Background(), teamMember, "se")
 	first.Roles[0] = "hacked"

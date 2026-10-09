@@ -20,7 +20,7 @@ func ptr(v int32) *int32 { return &v }
 func validateIn(t *testing.T, templateID string, actor domain.Actor, attrs domain.WorkItemAttributes) (*fakeProjectRepo, domain.ValidationResult, error) {
 	t.Helper()
 	repo := newFakeProjectRepo()
-	svc := newProjectService(repo)
+	svc := newProjectService(repo, newFakeDirectory(repo.log))
 	if _, err := svc.CreateProjectBoard(context.Background(), teamMember, in.CreateProjectInput{Name: "Chura", TemplateID: templateID}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -220,7 +220,8 @@ func TestValidateWorkItemAttributes_UnauthenticatedActor_IsRejected(t *testing.T
 }
 
 func TestValidateWorkItemAttributes_MalformedProjectID_IsInvalidID(t *testing.T) {
-	svc := newProjectService(newFakeProjectRepo())
+	repo := newFakeProjectRepo()
+	svc := newProjectService(repo, newFakeDirectory(repo.log))
 
 	_, err := svc.ValidateWorkItemAttributes(context.Background(), teamMember, "not-a-uuid", domain.WorkItemAttributes{})
 

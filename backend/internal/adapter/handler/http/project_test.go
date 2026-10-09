@@ -75,7 +75,8 @@ func send(t *testing.T, app *fiber.App, method, path, body string, headers map[s
 var sampleProject = &domain.Project{
 	ID: "11111111-1111-4111-8111-111111111111", Name: "Chura", Description: "d",
 	TemplateID: "se", Mode: domain.ModeSE, CreatedBy: "u1",
-	Members:   []domain.Member{{UserID: "u1", Role: "product_owner", AddedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)}},
+	GroupID:   "group-secret",
+	Members:   []domain.Member{{UserID: "u1", Email: "u1@example.com", Name: "Jojo Test", Role: "product_owner"}},
 	CreatedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC), UpdatedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
 }
 
@@ -103,7 +104,7 @@ func TestCreateProject_Returns201WithProjectJSON(t *testing.T) {
 		t.Fatalf("unexpected body: %v", body)
 	}
 	members := body["members"].([]any)
-	wantMember := map[string]any{"user_id": "u1", "role": "product_owner", "added_at": "2026-01-02T03:04:05Z"}
+	wantMember := map[string]any{"user_id": "u1", "email": "u1@example.com", "name": "Jojo Test", "role": "product_owner"}
 	if len(members) != 1 || !reflect.DeepEqual(members[0], wantMember) {
 		t.Fatalf("members = %v, want [%v]", members, wantMember)
 	}
@@ -131,6 +132,7 @@ func TestCreateProject_ErrorsMapToStatus(t *testing.T) {
 	}{
 		{"invalid input", &domain.InvalidInputError{Violations: violations}, 400},
 		{"auditor forbidden", fmt.Errorf("create project: %w", domain.ErrForbidden), 403},
+		{"keycloak unavailable", fmt.Errorf("create project: %w", domain.ErrUnavailable), 503},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -197,6 +199,26 @@ func TestGetProject_Returns200WithProjectJSON(t *testing.T) {
 	}
 }
 
+func TestGetProject_MemberJSONShape_HasNoAddedAtAndHidesGroupID(t *testing.T) {
+	app := projectApp(stubProjectService{getFn: func(domain.Actor, string) (*domain.Project, error) {
+		return sampleProject, nil
+	}})
+
+	status, body := send(t, app, nethttp.MethodGet, "/api/v1/projects/"+sampleProject.ID, "", memberHeaders)
+
+	if status != 200 {
+		t.Fatalf("status = %d, want 200 (%v)", status, body)
+	}
+	wantMember := map[string]any{"user_id": "u1", "email": "u1@example.com", "name": "Jojo Test", "role": "product_owner"}
+	members := body["members"].([]any)
+	if len(members) != 1 || !reflect.DeepEqual(members[0], wantMember) {
+		t.Fatalf("members = %v, want [%v]", members, wantMember)
+	}
+	if _, leaked := body["GroupID"]; leaked || body["group_id"] != nil {
+		t.Fatalf("group id must not be exposed: %v", body)
+	}
+}
+
 func TestGetProject_ErrorsMapToStatus(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -205,6 +227,7 @@ func TestGetProject_ErrorsMapToStatus(t *testing.T) {
 	}{
 		{"not found", fmt.Errorf("project x: %w", domain.ErrNotFound), 404},
 		{"bad id", fmt.Errorf("project id: %w", domain.ErrInvalidID), 400},
+		{"keycloak unavailable", fmt.Errorf("list members: %w", domain.ErrUnavailable), 503},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -233,6 +256,7 @@ func TestProjectErrors_UseFixedPublicMessages(t *testing.T) {
 		{fmt.Errorf("unknown role %q: %w", "root", domain.ErrUnauthenticated), 401, "unauthenticated"},
 		{fmt.Errorf("project id %q: %w", "<script>", domain.ErrInvalidID), 400, "invalid id"},
 		{fmt.Errorf("something: %w", domain.ErrInvalidInput), 400, "invalid input"},
+		{fmt.Errorf("list members: http://keycloak:8080/admin token=abc: %w", domain.ErrUnavailable), 503, "service unavailable"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.message, func(t *testing.T) {

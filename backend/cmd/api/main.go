@@ -10,6 +10,7 @@ import (
 	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc"
 	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/identity/keycloak"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/middleware"
 	"github.com/RookieJoel/Chura/backend/internal/service"
 	"google.golang.org/grpc"
@@ -43,6 +44,12 @@ func main() {
 
 	projectService := service.NewProjectConfigurationService(
 		memory.NewProjectRepository(connections.Postgres),
+		keycloak.NewDirectory(keycloak.Config{
+			BaseURL:      cfg.KeycloakBaseURL,
+			Realm:        cfg.KeycloakRealm,
+			ClientID:     cfg.KeycloakBackendClientID,
+			ClientSecret: cfg.KeycloakBackendClientSecret,
+		}),
 	)
 
 	sprintService := service.NewSprintService(

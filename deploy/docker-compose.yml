@@ -3,6 +3,10 @@ x-agile-execution-environment: &agile-execution-environment
   MONGODB_DATABASE: chura
   PORT: 8083
   KC_JWKS_ENDPOINT: http://keycloak:8080/realms/chura/protocol/openid-connect/certs
+  KC_BASE_URL: http://keycloak:8080
+  KC_REALM: chura
+  KC_BACKEND_CLIENT_ID: chura-backend
+  KC_BACKEND_CLIENT_SECRET: ${KC_BACKEND_CLIENT_SECRET:-chura-backend-dev-secret}
 
 name: chura-agile-execution-service
 services:

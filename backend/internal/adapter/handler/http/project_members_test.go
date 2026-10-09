@@ -51,6 +51,7 @@ func TestAddMember_ErrorsMapToStatus(t *testing.T) {
 		{"auditor forbidden", fmt.Errorf("add: %w", domain.ErrForbidden), 403},
 		{"not found", fmt.Errorf("project: %w", domain.ErrNotFound), 404},
 		{"duplicate", fmt.Errorf("member: %w", domain.ErrConflict), 409},
+		{"keycloak unavailable", fmt.Errorf("add: %w", domain.ErrUnavailable), 503},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -15,7 +15,7 @@ import (
 )
 
 func newTestApp() *fiber.App {
-	templates := handler.NewTemplateHandler(service.NewProjectConfigurationService(nil))
+	templates := handler.NewTemplateHandler(service.NewProjectConfigurationService(nil, nil))
 	return newTestRouter(nil, templates, handler.NewProjectHandler(nil))
 }
 
