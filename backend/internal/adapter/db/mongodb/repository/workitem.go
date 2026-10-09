@@ -74,7 +74,7 @@ func (repository *WorkItemRepository) List(projectID string) ([]domain.WorkItem,
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(context.Background())
+	defer func() { _ = cursor.Close(context.Background()) }()
 
 	var documents []workItemDocument
 	if err := cursor.All(context.Background(), &documents); err != nil {

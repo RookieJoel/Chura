@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Chura API
   description: Backend API for Chura — Project/Backlog/Sprint/Ticket Agile management.
-  version: 0.1.0
+  version: 0.2.0
 servers:
   - url: http://localhost:8080
     description: Local development
@@ -14,9 +14,434 @@ paths:
       responses:
         "200":
           description: Service is up
+  /api/v1/templates:
+    get:
+      summary: List available Templates (getAvailableTemplates)
+      operationId: getAvailableTemplates
+      security: [{ actorUserId: [], actorRole: [] }]
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Template" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /api/v1/templates/{templateId}:
+    get:
+      summary: Retrieve a Template definition (retrieveTemplateDefinition)
+      operationId: retrieveTemplateDefinition
+      security: [{ actorUserId: [], actorRole: [] }]
+      parameters:
+        - { name: templateId, in: path, required: true, schema: { type: string, example: se } }
+      responses:
+        "200":
+          description: Template
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Template" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/projects:
+    post:
+      summary: Create a Project / Project Board (createProjectBoard). Team Member only.
+      operationId: createProjectBoard
+      security: [{ actorUserId: [], actorRole: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateProjectRequest" }
+      responses:
+        "201":
+          description: Created. The caller is the first member with the Template's creator role.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "400": { $ref: "#/components/responses/InvalidInput" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/projects/{projectId}:
+    get:
+      summary: Retrieve Project data (retrieveProjectData). Members and Auditors only; other Team Members get 404.
+      operationId: retrieveProjectData
+      security: [{ actorUserId: [], actorRole: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "400": { $ref: "#/components/responses/InvalidInput" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/projects/{projectId}/members:
+    post:
+      summary: Add a member with the Template's default role (addProjectMember). Project members only.
+      operationId: addProjectMember
+      security: [{ actorUserId: [], actorRole: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        "201":
+          description: Project with the new member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "400": { $ref: "#/components/responses/InvalidInput" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/projects/{projectId}/members/{userId}/role:
+    put:
+      summary: Assign a Project Role to a member (assignProjectRole). Project members only. The last holder of the creator role cannot be moved off it.
+      operationId: assignProjectRole
+      security: [{ actorUserId: [], actorRole: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+        - { name: userId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, example: scrum_master }
+      responses:
+        "200":
+          description: Project with the updated member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "400": { $ref: "#/components/responses/InvalidInput" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/projects/{projectId}/work-items/validate:
+    post:
+      summary: Validate Work Item attributes against the Project's Template (validateWorkItemAttributes). Persists nothing; valid=false is still 200.
+      operationId: validateWorkItemAttributes
+      security: [{ actorUserId: [], actorRole: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WorkItemAttributes" }
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValidationResult" }
+        "400": { $ref: "#/components/responses/InvalidInput" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413": { description: Request body larger than 1 MiB }
+  /api/v1/sprints:
+    post:
+      summary: Create a Sprint inside a Project (createSprint). Team Member who belongs to the Project only.
+      operationId: createSprint
+      security: [{ actorUserId: [], actorRole: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SprintRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Sprint" }
+        "400": { $ref: "#/components/responses/InvalidInput" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    get:
+      summary: List the Sprints of one Project (listSprints). Project members and Auditors only; other Team Members get 404.
+      operationId: listSprints
+      security: [{ actorUserId: [], actorRole: [] }]
+      parameters:
+        - name: project_id
+          in: query
+          required: true
+          description: Required. Missing/blank gives 400 with a violation on project_id; a non-UUID gives 400 "invalid id".
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Sprints
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Sprint" }
+        "400": { $ref: "#/components/responses/InvalidInput" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/sprints/{sprintId}:
+    parameters:
+      - { name: sprintId, in: path, required: true, schema: { type: string, example: "7" } }
+    get:
+      summary: Retrieve a Sprint (getSprint). Members of its Project and Auditors only; anyone else gets 404.
+      operationId: getSprint
+      security: [{ actorUserId: [], actorRole: [] }]
+      responses:
+        "200":
+          description: Sprint
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Sprint" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      summary: Update a Sprint (updateSprint). Team Members who belong to its Project only; project_id is immutable and ignored.
+      operationId: updateSprint
+      security: [{ actorUserId: [], actorRole: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SprintUpdateRequest" }
+      responses:
+        "200":
+          description: The stored Sprint after the update
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Sprint" }
+        "400": { $ref: "#/components/responses/InvalidInput" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Delete a Sprint (deleteSprint). Team Members who belong to its Project only.
+      operationId: deleteSprint
+      security: [{ actorUserId: [], actorRole: [] }]
+      responses:
+        "204":
+          description: Deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-  schemas: {}
+    # TEMPORARY placeholder until the real authentication feature lands.
+    # Trusts the caller completely; never expose publicly.
+    actorUserId:
+      type: apiKey
+      in: header
+      name: X-User-ID
+    actorRole:
+      type: apiKey
+      in: header
+      name: X-User-Role
+      description: team_member or auditor
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    InvalidInput:
+      description: >-
+        Malformed id/body or rule violations. `error` is one of "invalid input"
+        (with `violations`), "invalid id" or "invalid JSON body".
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthenticated:
+      description: Missing or invalid X-User-ID / X-User-Role. `error` is "unauthenticated".
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Role not allowed for this action (e.g. Auditor mutating). `error` is "forbidden".
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Not found, or a Project (or its Sprint) the Team Member does not belong to. `error` is "not found".
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Duplicate member or last creator-role holder. `error` is "conflict".
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Fixed public message per error class; internal details are never exposed (500 is "internal server error").
+        violations:
+          type: array
+          items: { $ref: "#/components/schemas/Violation" }
+    Violation:
+      type: object
+      required: [field, message]
+      properties:
+        field: { type: string }
+        message: { type: string }
+    Template:
+      type: object
+      required: [id, name, mode, work_item_types, roles, default_role, creator_role, capabilities, validation_rules]
+      properties:
+        id: { type: string, example: se }
+        name: { type: string }
+        mode: { type: string, enum: [general, se] }
+        work_item_types:
+          type: array
+          items: { type: string, enum: [task, user_story, bug] }
+        roles: { type: array, items: { type: string } }
+        default_role: { type: string }
+        creator_role: { type: string }
+        capabilities: { type: array, items: { type: string } }
+        validation_rules: { $ref: "#/components/schemas/ValidationRules" }
+    ValidationRules:
+      type: object
+      description: Rules that drive validateWorkItemAttributes for Projects using the Template.
+      required: [required_fields, type_rules]
+      properties:
+        required_fields:
+          type: array
+          description: Text fields that must not be blank.
+          items: { type: string, enum: [title, description] }
+        story_points:
+          type: object
+          description: Present when story_points are constrained; a given value must be greater than greater_than.
+          required: [greater_than]
+          properties:
+            greater_than: { type: integer, example: 0 }
+        type_rules:
+          type: array
+          items:
+            type: object
+            required: [type, require_acceptance_criteria]
+            properties:
+              type: { type: string, enum: [task, user_story, bug] }
+              description_format:
+                type: string
+                enum: [user_story]
+                description: user_story requires "As a … I want … so that …".
+              require_acceptance_criteria: { type: boolean }
+    CreateProjectRequest:
+      type: object
+      required: [name, template_id]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100, description: Trimmed; duplicates allowed }
+        description: { type: string, maxLength: 2000, description: Trimmed }
+        template_id: { type: string }
+    Member:
+      type: object
+      required: [user_id, role, added_at]
+      properties:
+        user_id: { type: string }
+        role: { type: string }
+        added_at: { type: string, format: date-time }
+    Project:
+      type: object
+      required: [id, name, description, template_id, mode, created_by, members, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        template_id: { type: string }
+        mode: { type: string, enum: [general, se] }
+        created_by: { type: string }
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/Member" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    WorkItemAttributes:
+      type: object
+      description: >-
+        Draft attributes. No field is schema-required and no field is
+        enum-, range- or length-checked by the schema: a missing/blank title,
+        a type not allowed by the Template, non-positive story_points (SE) or
+        an exceeded input cap still return 200 with valid=false and the
+        matching violations, as decided by the Template's validation_rules and
+        the input caps below. Input caps (every Template, counted in
+        characters): title <= 200, description <= 10000, at most 50
+        acceptance_criteria, each <= 1000. Request bodies over 1 MiB are
+        rejected with 413 before validation.
+      properties:
+        type:
+          type: string
+          description: >-
+            Must be one of the Template's work_item_types (General: task;
+            SE: user_story, task, bug). Any other value, including an unknown
+            type, returns 200 with valid=false and a violation on "type".
+        title: { type: string, description: "Required (non-blank); at most 200 characters." }
+        description: { type: string, description: "At most 10000 characters." }
+        story_points:
+          type: integer
+          description: SE only - must be greater than 0 when provided. Unconstrained in General.
+        acceptance_criteria:
+          type: array
+          description: At most 50 items, each at most 1000 characters.
+          items: { type: string }
+    ValidationResult:
+      type: object
+      required: [valid, violations]
+      properties:
+        valid: { type: boolean }
+        violations:
+          type: array
+          items: { $ref: "#/components/schemas/Violation" }
+    SprintRequest:
+      type: object
+      required: [project_id, name, team]
+      properties:
+        project_id: { type: string, format: uuid }
+        name: { type: string, maxLength: 120 }
+        team: { type: string, maxLength: 120 }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        status: { type: string, enum: [planned, active, completed] }
+    SprintUpdateRequest:
+      type: object
+      required: [name, team]
+      properties:
+        name: { type: string, maxLength: 120 }
+        team: { type: string, maxLength: 120 }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        status: { type: string, enum: [planned, active, completed] }
+    Sprint:
+      type: object
+      properties:
+        id: { type: string }
+        project_id: { type: string, format: uuid }
+        name: { type: string }
+        team: { type: string }
+        start_date: { type: string, format: date-time }
+        end_date: { type: string, format: date-time }
+        status: { type: string, enum: [planned, active, completed] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }

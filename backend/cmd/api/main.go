@@ -11,7 +11,6 @@ import (
 	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/middleware"
-	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/RookieJoel/Chura/backend/internal/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -34,12 +33,21 @@ func main() {
 	}
 
 	connections := &db.Connections{Postgres: postgresDB, Mongo: mongoConnection}
-	defer connections.Close()
+	defer func() {
+		if err := connections.Close(); err != nil {
+			log.Printf("close connections: %v", err)
+		}
+	}()
 
 	sprintRepository := memory.NewSprintRepository(connections.Postgres)
 
+	projectService := service.NewProjectConfigurationService(
+		memory.NewProjectRepository(connections.Postgres),
+	)
+
 	sprintService := service.NewSprintService(
 		sprintRepository,
+		projectService,
 	)
 
 	sprintHandler := http.NewSprintHandler(
@@ -47,6 +55,8 @@ func main() {
 	)
 
 	authHandler := http.NewAuthHandler()
+	templateHandler := http.NewTemplateHandler(projectService)
+	projectHandler := http.NewProjectHandler(projectService)
 
 	jwks, err := keyfunc.NewDefault([]string{cfg.KeycloakJWKSURL})
 	if err != nil {
@@ -58,13 +68,13 @@ func main() {
 	app := http.NewRouter(
 		sprintHandler,
 		authHandler,
+		templateHandler,
+		projectHandler,
 		cfg.FrontendURL,
 		authMiddleware,
 	)
 
-	var workItemRepository out.WorkItemRepository = connections.Mongo.WorkItemsrepository
-
-	workItemService := service.NewWorkItemService(workItemRepository)
+	workItemService := service.NewWorkItemService(connections.Mongo.WorkItemsrepository)
 
 	grpcServer := grpc.NewServer()
 	workitempb.RegisterWorkItemServiceServer(grpcServer, workitemgrpc.NewServer(workItemService))
