@@ -1,0 +1,80 @@
+{
+  "id": "chura",
+  "realm": "chura",
+  "enabled": true,
+  "loginTheme": "flowline",
+  "accountTheme": "flowline",
+  "adminTheme": "flowline",
+  "emailTheme": "flowline",
+  "clients": [
+    {
+      "clientId": "chura-auth-client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      }
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "auditor",
+        "description": "Auditor for chura",
+        "composite": false,
+        "clientRole": false
+      },
+            {
+        "name": "member",
+        "description": "member for chura",
+        "composite": false,
+        "clientRole": false
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "jojo",
+      "enabled": true,
+      "email": "jojo@example.com",
+      "firstName": "Suthanop",
+      "lastName": "Channah",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "test1234",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "auditor"
+      ]
+    },
+    {
+      "username": "tonnam",
+      "enabled": true,
+      "email": "tonnam@example.com",
+      "firstName": "Jirapat",
+      "lastName": "Dangkowkaew",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "test1234",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "member"
+      ]
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS sprints (
@@ -23,3 +24,6 @@ CREATE TABLE IF NOT EXISTS sprints (
             OR end_date >= start_date
         )
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS sprints;

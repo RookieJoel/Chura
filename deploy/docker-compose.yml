@@ -1,0 +1,119 @@
+x-agile-execution-environment: &agile-execution-environment
+  MONGODB_URI: mongodb://mongo-db:27017
+  MONGODB_DATABASE: chura
+  PORT: 8083
+  KC_JWKS_ENDPOINT: http://keycloak:8080/realms/chura/protocol/openid-connect/certs
+
+name: chura-agile-execution-service
+services:
+  
+  mongo-db:
+    image: mongo:8
+    container_name: chura-agile-execution-mongodb
+    environment:
+      MONGO_INITDB_DATABASE: chura
+    ports:
+      - "27017:27017"
+    volumes:
+      - agile-execution-mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping').ok\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - agile-execution-mongodb
+
+  agile-execution-api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: chura-agile-execution-api
+    environment:
+      <<: *agile-execution-environment
+      DATABASE_URL: postgresql://chura:admin@postgre-db:5432/chura
+    depends_on:
+      mongo-db:
+        condition: service_healthy
+      postgre-db:
+        condition: service_healthy
+      agile-execution-migrations:
+        condition: service_completed_successfully
+    ports:
+      - "8083:8083"
+      - "9000:9000"
+    networks:
+      - agile-execution-api
+      - agile-execution-mongodb
+      - chura-keycloak
+
+  agile-execution-migrations:
+    build:
+      context: images/
+      dockerfile: goose.Dockerfile
+    container_name: chura-agile-execution-migrations
+    restart: "no"
+    command:
+      - -dir=/migrations
+      - postgres
+      - postgres://chura:admin@postgre-db:5432/chura?sslmode=disable
+      - up
+    volumes:
+      - ../backend/internal/adapter/db/postgres/migrations:/migrations:ro
+    depends_on:
+      postgre-db:
+        condition: service_healthy
+    networks:
+      - agile-execution-api
+
+  postgre-db:
+    image: postgres
+    container_name: chura-agile-execution-postgres
+    restart: always
+    # set shared memory limit when using docker compose
+    shm_size: 128mb
+    ports:
+      - "5432:5432"
+    volumes:
+      - agile-execution-postgres-data:/var/lib/postgresql/
+    environment:
+      POSTGRES_PASSWORD: admin
+      POSTGRES_USER: chura
+      POSTGRES_DB: chura
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-h", "localhost", "-p", "5432", "-U", "chura"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - agile-execution-api
+
+  mongo-express:
+    image: mongo-express:1
+    container_name: chura-agile-execution-mongo-express
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongo-db:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      mongo-db:
+        condition: service_healthy
+    networks:
+      - agile-execution-mongodb
+
+volumes:
+  agile-execution-mongodb-data:
+  agile-execution-postgres-data:
+    name: chura-agile-execution-postgres-data
+
+networks:
+  agile-execution-api:
+    driver: bridge
+  agile-execution-mongodb:
+    driver: bridge
+  chura-keycloak:
+    external: true
+    name: chura-keycloak

@@ -23,8 +23,8 @@ func ConnectPostgresDB(postgresURL string) (*gorm.DB, error) {
 	return postgresDB, nil
 }
 
-func ConnectMongoDB() (*mongodb.Connection, error) {
-	mongoConnection, err := mongodb.Connect()
+func ConnectMongoDB(uri, databaseName string) (*mongodb.Connection, error) {
+	mongoConnection, err := mongodb.Connect(uri, databaseName)
 	if err != nil {
 		return nil, fmt.Errorf("connect mongodb: %w", err)
 	}
