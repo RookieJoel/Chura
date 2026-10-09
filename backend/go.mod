@@ -7,6 +7,7 @@ require (
 	github.com/gofiber/websocket/v2 v2.2.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
+	github.com/rabbitmq/amqp091-go v1.10.0
 	go.mongodb.org/mongo-driver v1.17.4
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12

@@ -12,6 +12,7 @@ import (
 	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc"
 	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem"
 	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/messaging/rabbitmq"
 	notificationmemory "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
 	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/RookieJoel/Chura/backend/internal/service"
@@ -83,10 +84,38 @@ func main() {
 			From:     os.Getenv("SMTP_FROM"),
 		},
 	)
-	workItemService := service.NewWorkItemServiceWithNotifier(
-		workItemRepository,
-		notificationService,
-	)
+	rabbitURL := os.Getenv("RABBITMQ_URL")
+	if rabbitURL == "" {
+		rabbitURL = "amqp://chura_dev:change_me_dev@localhost:5672/"
+	}
+	rabbitConnection, err := rabbitmq.Connect(rabbitURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rabbitConnection.Close()
+
+	rabbitPublisher, err := rabbitmq.NewPublisher(rabbitConnection)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rabbitPublisher.Close()
+
+	notificationQueue := os.Getenv("RABBITMQ_NOTIFICATION_QUEUE")
+	if notificationQueue == "" {
+		notificationQueue = "chura-notifications"
+	}
+	notificationConsumer, err := rabbitmq.NewNotificationConsumer(rabbitConnection, notificationQueue)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer notificationConsumer.Close()
+	go func() {
+		if err := notificationConsumer.Consume(notificationService); err != nil {
+			log.Printf("notification consumer stopped: %v", err)
+		}
+	}()
+
+	workItemService := service.NewWorkItemServiceWithPublisher(workItemRepository, rabbitPublisher)
 
 	grpcServer := grpc.NewServer()
 	workitempb.RegisterWorkItemServiceServer(grpcServer, workitemgrpc.NewServer(workItemService))

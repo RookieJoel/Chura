@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	memory "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
@@ -106,6 +107,43 @@ func TestWorkItemServiceNotifiesWhenSprintIsFinished(t *testing.T) {
 	}
 	if len(notifier.calls[0].reporterIDs) != 1 || notifier.calls[0].reporterIDs[0] != "reporter-1" {
 		t.Fatalf("expected one unique reporter, got %#v", notifier.calls[0].reporterIDs)
+	}
+}
+
+func TestWorkItemServicePublishesSprintFinishedEvent(t *testing.T) {
+	publisher := &eventPublisher{}
+	workItemService := service.NewWorkItemServiceWithPublisher(
+		memory.NewWorkItemRepository(),
+		publisher,
+	)
+	item := validWorkItem()
+	item.SprintID = "sprint-published"
+	item.Status = domain.WorkItemStatusDone
+	item.ReporterID = "reporter-1"
+	if _, err := workItemService.CreateWorkItem(item); err != nil {
+		t.Fatalf("create work item: %v", err)
+	}
+
+	finished, err := workItemService.CheckSprintFinished("sprint-published")
+	if err != nil {
+		t.Fatalf("check sprint: %v", err)
+	}
+	if !finished {
+		t.Fatal("expected sprint to be finished")
+	}
+	if len(publisher.events) != 1 || publisher.events[0].topic != "sprint.finished" {
+		t.Fatalf("expected one sprint.finished event, got %#v", publisher.events)
+	}
+
+	var event struct {
+		SprintID    string   `json:"sprint_id"`
+		ReporterIDs []string `json:"reporter_ids"`
+	}
+	if err := json.Unmarshal(publisher.events[0].payload, &event); err != nil {
+		t.Fatalf("decode published event: %v", err)
+	}
+	if event.SprintID != "sprint-published" || len(event.ReporterIDs) != 1 || event.ReporterIDs[0] != "reporter-1" {
+		t.Fatalf("unexpected sprint.finished event: %#v", event)
 	}
 }
 
@@ -253,6 +291,23 @@ type sprintNotificationCall struct {
 
 type sprintNotifier struct {
 	calls []sprintNotificationCall
+}
+
+type publishedEvent struct {
+	topic   string
+	payload []byte
+}
+
+type eventPublisher struct {
+	events []publishedEvent
+}
+
+func (publisher *eventPublisher) Publish(topic string, payload []byte) error {
+	publisher.events = append(publisher.events, publishedEvent{
+		topic:   topic,
+		payload: append([]byte(nil), payload...),
+	})
+	return nil
 }
 
 func (notifier *sprintNotifier) SendSprintFinishedNotifications(

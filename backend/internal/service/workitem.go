@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -16,6 +17,7 @@ var ErrWorkItemNotFound = domain.ErrNotFound
 type WorkItemService struct {
 	repository out.WorkItemRepository
 	notifier   SprintNotifier
+	publisher  out.EventPublisher
 }
 
 type SprintNotifier interface {
@@ -34,6 +36,13 @@ func NewWorkItemServiceWithNotifier(
 		repository: repository,
 		notifier:   notifier,
 	}
+}
+
+func NewWorkItemServiceWithPublisher(
+	repository out.WorkItemRepository,
+	publisher out.EventPublisher,
+) *WorkItemService {
+	return &WorkItemService{repository: repository, publisher: publisher}
 }
 
 func (service *WorkItemService) CreateWorkItem(item domain.WorkItem) (domain.WorkItem, error) {
@@ -102,8 +111,21 @@ func (service *WorkItemService) CheckSprintFinished(sprintID string) (bool, erro
 	if len(reporterIDs) == 0 {
 		return true, nil
 	}
+	if service.publisher != nil {
+		payload, err := json.Marshal(struct {
+			SprintID    string   `json:"sprint_id"`
+			ReporterIDs []string `json:"reporter_ids"`
+		}{sprintID, reporterIDs})
+		if err != nil {
+			return false, fmt.Errorf("encode sprint finished event: %w", err)
+		}
+		if err := service.publisher.Publish("sprint.finished", payload); err != nil {
+			return false, fmt.Errorf("publish sprint finished event: %w", err)
+		}
+		return true, nil
+	}
 	if service.notifier == nil {
-		return false, errors.New("sprint notifier is not configured")
+		return false, errors.New("sprint notifier or event publisher is not configured")
 	}
 	if err := service.notifier.SendSprintFinishedNotifications(sprintID, reporterIDs); err != nil {
 		return false, fmt.Errorf("notify sprint reporters: %w", err)
