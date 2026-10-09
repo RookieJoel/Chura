@@ -3,14 +3,24 @@ package service_test
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
 )
 
+// writeDelay is the pause before a directory write lands.
+const writeDelay = 2 * time.Millisecond
+
 // callLog records the order of calls across the fake repository and directory.
-type callLog struct{ calls []string }
+type callLog struct {
+	mu    sync.Mutex
+	calls []string
+}
 
 func (l *callLog) record(format string, args ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.calls = append(l.calls, fmt.Sprintf(format, args...))
 }
 
@@ -20,6 +30,8 @@ type fakeProjectRepo struct {
 	writes    int // number of mutating calls, to prove read-only operations persist nothing
 	log       *callLog
 	createErr error
+	lockMu    sync.Mutex // real mutex so concurrency tests exercise serialisation
+	locks     int        // times WithMembershipLock was taken
 }
 
 func newFakeProjectRepo() *fakeProjectRepo {
@@ -46,9 +58,19 @@ func (r *fakeProjectRepo) GetByID(_ context.Context, id string) (*domain.Project
 	return &p, nil
 }
 
+func (r *fakeProjectRepo) WithMembershipLock(ctx context.Context, projectID string, fn func(ctx context.Context) error) error {
+	r.lockMu.Lock()
+	defer r.lockMu.Unlock()
+	r.locks++
+	r.log.record("repo.WithMembershipLock(%s)", projectID)
+	return fn(ctx)
+}
+
 // fakeDirectory is an in-memory out.ProjectDirectory. errs injects a failure
 // per method name; every call is recorded, with its arguments, in log.
 type fakeDirectory struct {
+	mu      sync.Mutex
+	users   map[string]domain.DirectoryUser // by email
 	log     *callLog
 	errs    map[string]error
 	members map[string][]domain.Member // by group id
@@ -56,7 +78,14 @@ type fakeDirectory struct {
 }
 
 func newFakeDirectory(log *callLog) *fakeDirectory {
-	return &fakeDirectory{log: log, errs: map[string]error{}, members: map[string][]domain.Member{}, groups: map[string]string{}}
+	teamMemberUser := func(id string) domain.DirectoryUser {
+		return domain.DirectoryUser{ID: id, Email: id + "@example.com", Name: "User " + id, Role: domain.SystemRoleTeamMember}
+	}
+	users := map[string]domain.DirectoryUser{
+		"u1@example.com": teamMemberUser("u1"),
+		"u2@example.com": teamMemberUser("u2"),
+	}
+	return &fakeDirectory{users: users, log: log, errs: map[string]error{}, members: map[string][]domain.Member{}, groups: map[string]string{}}
 }
 
 func (d *fakeDirectory) CreateProjectGroup(_ context.Context, projectID string) (string, error) {
@@ -74,11 +103,21 @@ func (d *fakeDirectory) DeleteProjectGroup(_ context.Context, groupID string) er
 	return d.errs["DeleteProjectGroup"]
 }
 
-func (d *fakeDirectory) FindUserByEmail(context.Context, string) (domain.DirectoryUser, error) {
-	panic("not used before ticket 03")
+func (d *fakeDirectory) FindUserByEmail(_ context.Context, email string) (domain.DirectoryUser, error) {
+	d.log.record("FindUserByEmail(%s)", email)
+	if err := d.errs["FindUserByEmail"]; err != nil {
+		return domain.DirectoryUser{}, err
+	}
+	user, ok := d.users[email]
+	if !ok {
+		return domain.DirectoryUser{}, fmt.Errorf("user %s: %w", email, domain.ErrNotFound)
+	}
+	return user, nil
 }
 
 func (d *fakeDirectory) ListMembers(_ context.Context, groupID, _ string) ([]domain.Member, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.log.record("ListMembers(%s)", groupID)
 	if err := d.errs["ListMembers"]; err != nil {
 		return nil, err
@@ -87,6 +126,9 @@ func (d *fakeDirectory) ListMembers(_ context.Context, groupID, _ string) ([]dom
 }
 
 func (d *fakeDirectory) AddMember(_ context.Context, groupID, projectID, userID string, role domain.ProjectRole) error {
+	time.Sleep(writeDelay) // widens the check-then-write window so a missing lock is caught
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.log.record("AddMember(%s,%s,%s)", groupID, userID, role)
 	if err := d.errs["AddMember"]; err != nil {
 		return err
@@ -99,6 +141,9 @@ func (d *fakeDirectory) AddMember(_ context.Context, groupID, projectID, userID 
 }
 
 func (d *fakeDirectory) SetMemberRole(_ context.Context, projectID, userID string, role domain.ProjectRole) error {
+	time.Sleep(writeDelay) // widens the check-then-write window so a missing lock is caught
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.log.record("SetMemberRole(%s,%s)", userID, role)
 	if err := d.errs["SetMemberRole"]; err != nil {
 		return err

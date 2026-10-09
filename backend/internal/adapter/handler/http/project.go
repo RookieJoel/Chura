@@ -46,7 +46,7 @@ func (h *ProjectHandler) Get(c *fiber.Ctx) error {
 }
 
 type addMemberRequest struct {
-	UserID string `json:"user_id"`
+	Email string `json:"email"`
 }
 
 func (h *ProjectHandler) AddMember(c *fiber.Ctx) error {
@@ -54,7 +54,7 @@ func (h *ProjectHandler) AddMember(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return writeError(c, errInvalidJSONBody)
 	}
-	project, err := h.service.AddProjectMember(c.UserContext(), actorFrom(c), c.Params("id"), req.UserID)
+	project, err := h.service.AddProjectMember(c.UserContext(), actorFrom(c), c.Params("id"), req.Email)
 	if err != nil {
 		return writeError(c, err)
 	}

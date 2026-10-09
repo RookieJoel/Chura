@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Nerzal/gocloak/v13"
@@ -39,6 +40,9 @@ type Directory struct {
 	client *gocloak.GoCloak
 	realm  string
 	tokens *tokenSource
+	// userLocks serialises attribute read-modify-write per user within this
+	// process: the Admin API replaces the whole attribute map on PUT.
+	userLocks sync.Map // user id -> *sync.Mutex
 }
 
 var _ out.ProjectDirectory = (*Directory)(nil)
@@ -223,8 +227,14 @@ func (d *Directory) RemoveMember(ctx context.Context, groupID, projectID, userID
 
 // writeRoleAttribute sets (or, for an empty value, deletes) the user's Project
 // Role attribute. The Admin API replaces the whole user on PUT, so the user is
-// read first and written back with every other field and attribute intact.
+// read first and written back with every other field and attribute intact,
+// under a per-user mutex so concurrent writes for one user do not overwrite
+// each other.
 func (d *Directory) writeRoleAttribute(ctx context.Context, token, projectID, userID, value string) error {
+	lock, _ := d.userLocks.LoadOrStore(userID, &sync.Mutex{})
+	mu := lock.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
 	user, err := d.client.GetUserByID(ctx, token, d.realm, userID)
 	if err != nil {
 		return err

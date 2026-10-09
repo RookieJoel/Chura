@@ -122,28 +122,40 @@ func (s *ProjectConfigurationService) undoCreate(ctx context.Context, project *d
 	}
 }
 
-func (s *ProjectConfigurationService) AddProjectMember(ctx context.Context, actor domain.Actor, projectID, userID string) (*domain.Project, error) {
+func (s *ProjectConfigurationService) AddProjectMember(ctx context.Context, actor domain.Actor, projectID, email string) (*domain.Project, error) {
 	project, err := s.loadMutable(ctx, actor, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("add project member: %w", err)
 	}
-	userID = strings.TrimSpace(userID)
-	if userID == "" || utf8.RuneCountInString(userID) > domain.MaxUserIDRunes {
+	email = strings.TrimSpace(email)
+	if email == "" || utf8.RuneCountInString(email) > domain.MaxEmailRunes || !strings.Contains(email, "@") {
 		return nil, fmt.Errorf("add project member: %w", &domain.InvalidInputError{Violations: []domain.Violation{
-			{Field: "user_id", Message: fmt.Sprintf("user_id is required and must be at most %d characters", domain.MaxUserIDRunes)},
+			{Field: "email", Message: fmt.Sprintf("email is required, must contain @ and be at most %d characters", domain.MaxEmailRunes)},
 		}})
 	}
 	template, err := templateOf(project)
 	if err != nil {
 		return nil, fmt.Errorf("add project member: %w", err)
 	}
-	if err := s.refreshMembers(ctx, project); err != nil {
+	user, err := s.directory.FindUserByEmail(ctx, email)
+	if err != nil {
 		return nil, fmt.Errorf("add project member: %w", err)
 	}
-	if _, isMember := project.MemberByID(userID); isMember {
-		return nil, fmt.Errorf("add project member: user %q is already a member: %w", userID, domain.ErrConflict)
+	if user.Role != domain.SystemRoleTeamMember {
+		return nil, fmt.Errorf("add project member: %w", &domain.InvalidInputError{Violations: []domain.Violation{
+			{Field: "email", Message: "user is not a Team Member"},
+		}})
 	}
-	if err := s.directory.AddMember(ctx, project.GroupID, project.ID, userID, template.DefaultRole); err != nil {
+	err = s.repo.WithMembershipLock(ctx, project.ID, func(ctx context.Context) error {
+		if err := s.refreshMembers(ctx, project); err != nil {
+			return err
+		}
+		if _, isMember := project.MemberByID(user.ID); isMember {
+			return fmt.Errorf("user %q is already a member: %w", user.ID, domain.ErrConflict)
+		}
+		return s.directory.AddMember(ctx, project.GroupID, project.ID, user.ID, template.DefaultRole)
+	})
+	if err != nil {
 		return nil, fmt.Errorf("add project member: %w", err)
 	}
 	return s.loadVisible(ctx, actor, project.ID)
@@ -164,13 +176,16 @@ func (s *ProjectConfigurationService) AssignProjectRole(ctx context.Context, act
 		}})
 	}
 	userID = strings.TrimSpace(userID)
-	if err := s.refreshMembers(ctx, project); err != nil {
-		return nil, fmt.Errorf("assign project role: %w", err)
-	}
-	if err := keepCreatorRoleGuard(userID, role, template.CreatorRole)(project.Members); err != nil {
-		return nil, fmt.Errorf("assign project role: %w", err)
-	}
-	if err := s.directory.SetMemberRole(ctx, project.ID, userID, role); err != nil {
+	err = s.repo.WithMembershipLock(ctx, project.ID, func(ctx context.Context) error {
+		if err := s.refreshMembers(ctx, project); err != nil {
+			return err
+		}
+		if err := keepCreatorRoleGuard(userID, role, template.CreatorRole)(project.Members); err != nil {
+			return err
+		}
+		return s.directory.SetMemberRole(ctx, project.ID, userID, role)
+	})
+	if err != nil {
 		return nil, fmt.Errorf("assign project role: %w", err)
 	}
 	return s.loadVisible(ctx, actor, project.ID)

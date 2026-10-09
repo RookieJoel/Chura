@@ -11,6 +11,10 @@ type ProjectRepository interface {
 	Create(ctx context.Context, project *domain.Project) error
 	// GetByID returns the project row with Members nil; domain.ErrNotFound if missing.
 	GetByID(ctx context.Context, id string) (*domain.Project, error)
+	// WithMembershipLock runs fn while holding a transaction-scoped advisory
+	// lock for the project, serialising membership changes across instances.
+	// fn's error is returned unchanged.
+	WithMembershipLock(ctx context.Context, projectID string, fn func(ctx context.Context) error) error
 }
 
 // ProjectDirectory is the identity store holding Project membership and Project Role.

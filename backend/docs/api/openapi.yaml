@@ -84,7 +84,7 @@ paths:
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/projects/{projectId}/members:
     post:
-      summary: Add a member with the Template's default role (addProjectMember). Project members only.
+      summary: Add a member by email with the Template's default role (addProjectMember). Project members only.
       operationId: addProjectMember
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -92,22 +92,33 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [user_id]
-              properties:
-                user_id: { type: string, minLength: 1, maxLength: 100 }
+            schema: { $ref: "#/components/schemas/AddMemberRequest" }
       responses:
         "201":
           description: Project with the new member
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Project" }
-        "400": { $ref: "#/components/responses/InvalidInput" }
+        "400":
+          description: >-
+            Malformed body, or a violation on `email`: blank, longer than 254
+            characters, missing `@`, or "user is not a Team Member" (the person
+            is an Auditor or has no Chura role).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
+        "404":
+          description: Unknown Project (or one the caller does not belong to), or no user with this email.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: The person is already a member of the Project. `error` is "conflict".
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/projects/{projectId}/members/{userId}/role:
     put:
@@ -314,6 +325,15 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
   schemas:
+    AddMemberRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Exact email of an existing Team Member account (trimmed).
     Error:
       type: object
       required: [error]

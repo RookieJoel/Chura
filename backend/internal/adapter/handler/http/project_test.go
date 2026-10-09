@@ -25,13 +25,13 @@ type stubProjectService struct {
 	in.ProjectConfigurationService
 	createFn   func(domain.Actor, in.CreateProjectInput) (*domain.Project, error)
 	getFn      func(domain.Actor, string) (*domain.Project, error)
-	addFn      func(a domain.Actor, projectID, userID string) (*domain.Project, error)
+	addFn      func(a domain.Actor, projectID, email string) (*domain.Project, error)
 	assignFn   func(a domain.Actor, projectID, userID string, role domain.ProjectRole) (*domain.Project, error)
 	validateFn func(a domain.Actor, projectID string, attrs domain.WorkItemAttributes) (domain.ValidationResult, error)
 }
 
-func (s stubProjectService) AddProjectMember(_ context.Context, a domain.Actor, projectID, userID string) (*domain.Project, error) {
-	return s.addFn(a, projectID, userID)
+func (s stubProjectService) AddProjectMember(_ context.Context, a domain.Actor, projectID, email string) (*domain.Project, error) {
+	return s.addFn(a, projectID, email)
 }
 
 func (s stubProjectService) AssignProjectRole(_ context.Context, a domain.Actor, projectID, userID string, role domain.ProjectRole) (*domain.Project, error) {

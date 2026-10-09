@@ -17,6 +17,8 @@ import (
 const (
 	pgUniqueViolation     = "23505"
 	pgForeignKeyViolation = "23503"
+
+	membershipLockPrefix = "project-membership:"
 )
 
 type projectModel struct {
@@ -68,6 +70,23 @@ func (r *ProjectRepository) GetByID(ctx context.Context, id string) (*domain.Pro
 		Mode: domain.Mode(model.Mode), CreatedBy: model.CreatedBy, GroupID: model.GroupID,
 		CreatedAt: model.CreatedAt, UpdatedAt: model.UpdatedAt,
 	}, nil
+}
+
+// WithMembershipLock holds a per-project advisory lock for the duration of fn.
+// The transaction exists only to scope the lock; fn does not use it.
+func (r *ProjectRepository) WithMembershipLock(ctx context.Context, projectID string, fn func(ctx context.Context) error) error {
+	var fnErr error
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", membershipLockPrefix+projectID).Error; err != nil {
+			return fmt.Errorf("lock project %s membership: %w", projectID, err)
+		}
+		fnErr = fn(ctx)
+		return fnErr
+	})
+	if fnErr != nil {
+		return fnErr
+	}
+	return err
 }
 
 // mapProjectError translates Postgres constraint violations to bare domain
