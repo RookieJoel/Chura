@@ -16,6 +16,30 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Authentication
+
+The frontend uses the repository's Keycloak realm (`chura`) through
+Auth.js/NextAuth. Set these variables before starting the app:
+
+```bash
+AUTH_SECRET=replace-with-a-long-random-value
+KEYCLOAK_ISSUER=http://localhost:8080/realms/chura
+KEYCLOAK_CLIENT_ID=chura-auth-client
+KEYCLOAK_CLIENT_SECRET=
+CHURA_API_URL=http://localhost:8083
+NEXT_PUBLIC_WORK_ITEM_RPC_URL=ws://localhost:8083/ws/work-items
+```
+
+`KEYCLOAK_CLIENT_SECRET` remains empty for the imported public Keycloak client.
+Every frontend page requires a Keycloak session. After login, the server
+forwards the session's access token to `/api/v1/whoami`; the verified ID,
+email, and roles are available from the profile menu in the top navigation.
+
+Unauthenticated requests are sent to the `/login` server page. That page calls
+`signIn("keycloak", { redirectTo })` directly, so Auth.js starts the Keycloak
+authorization flow without showing its provider-selection page. The imported
+`chura` realm and its client use the `flowline` Keycloak login theme.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
