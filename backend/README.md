@@ -25,6 +25,12 @@ talks to Keycloak both to validate tokens and through the Admin API.
 `backend/.env` and adjust. The four `KC_*` variables above are required; the
 backend refuses to start without them.
 
+> **Dev only:** `keycloak/realm-config.json` seeds the `chura-backend` client
+> secret and test-user passwords for local import. For any shared or
+> production Keycloak, rotate the `chura-backend` secret in Keycloak and pass
+> the new value via `KC_BACKEND_CLIENT_SECRET`; `deploy/docker-compose.yml`
+> refuses to start when it is unset.
+
 ### Recreate local Keycloak after the realm change
 
 The realm import adds the `chura-backend` client, email addresses, the user

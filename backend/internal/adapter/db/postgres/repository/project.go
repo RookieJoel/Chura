@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 
+	"github.com/RookieJoel/Chura/backend/internal/adapter/lockstripe"
 	"github.com/RookieJoel/Chura/backend/internal/domain"
 	"github.com/RookieJoel/Chura/backend/internal/port/out"
 )
@@ -37,12 +38,15 @@ func (projectModel) TableName() string { return "projects" }
 
 type ProjectRepository struct {
 	db *gorm.DB
+	// membershipLocks queues same-project requests in this process before they
+	// take a pooled DB connection for the advisory lock.
+	membershipLocks *lockstripe.Set
 }
 
 var _ out.ProjectRepository = (*ProjectRepository)(nil)
 
 func NewProjectRepository(db *gorm.DB) *ProjectRepository {
-	return &ProjectRepository{db: db}
+	return &ProjectRepository{db: db, membershipLocks: lockstripe.New()}
 }
 
 func (r *ProjectRepository) Create(ctx context.Context, p *domain.Project) error {
@@ -72,11 +76,18 @@ func (r *ProjectRepository) GetByID(ctx context.Context, id string) (*domain.Pro
 	}, nil
 }
 
-// WithMembershipLock holds a per-project advisory lock for the duration of fn.
-// The transaction exists only to scope the lock; fn does not use it.
+// WithMembershipLock holds a per-project lock for the duration of fn. An
+// in-process stripe lock is taken first, so waiting requests hold no DB
+// connection; the Postgres advisory lock then covers other instances. The
+// transaction exists only to scope the advisory lock; fn does not use it.
 func (r *ProjectRepository) WithMembershipLock(ctx context.Context, projectID string, fn func(ctx context.Context) error) error {
+	unlock, err := r.membershipLocks.Lock(ctx, projectID)
+	if err != nil {
+		return fmt.Errorf("wait for project %s membership lock: %w", projectID, errors.Join(domain.ErrUnavailable, err))
+	}
+	defer unlock()
 	var fnErr error
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", membershipLockPrefix+projectID).Error; err != nil {
 			return fmt.Errorf("lock project %s membership: %w", projectID, err)
 		}

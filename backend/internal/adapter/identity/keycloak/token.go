@@ -29,7 +29,7 @@ type tokenSource struct {
 func (s *tokenSource) get(ctx context.Context) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.token != "" && s.now().Before(s.expires.Add(-tokenRefreshMargin)) {
+	if !s.needsRefresh() {
 		return s.token, nil
 	}
 	jwt, err := s.client.LoginClient(ctx, s.clientID, s.clientSecret, s.realm)
@@ -42,6 +42,12 @@ func (s *tokenSource) get(ctx context.Context) (string, error) {
 	s.token = jwt.AccessToken
 	s.expires = s.now().Add(time.Duration(jwt.ExpiresIn) * time.Second)
 	return s.token, nil
+}
+
+// needsRefresh reports whether the cached token is missing or within the
+// refresh margin of its expiry. The caller holds s.mu.
+func (s *tokenSource) needsRefresh() bool {
+	return s.token == "" || !s.now().Before(s.expires.Add(-tokenRefreshMargin))
 }
 
 // invalidate drops the cached token, e.g. after Keycloak answered 401.

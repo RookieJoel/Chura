@@ -96,11 +96,11 @@ func (s *ProjectConfigurationService) CreateProjectBoard(ctx context.Context, ac
 	}
 	project.GroupID = groupID
 	if err := s.directory.AddMember(ctx, groupID, project.ID, actor.UserID, template.CreatorRole); err != nil {
-		s.undoCreate(ctx, project, false)
+		s.undoCreate(ctx, project)
 		return nil, fmt.Errorf("create project: %w", err)
 	}
 	if err := s.repo.Create(ctx, project); err != nil {
-		s.undoCreate(ctx, project, true)
+		s.undoCreate(ctx, project)
 		return nil, fmt.Errorf("create project: %w", err)
 	}
 	project.Members = []domain.Member{{UserID: actor.UserID, Email: actor.Email, Role: template.CreatorRole}}
@@ -110,12 +110,13 @@ func (s *ProjectConfigurationService) CreateProjectBoard(ctx context.Context, ac
 // undoCreate best-effort reverts the directory writes of a failed create.
 // Failures are logged for manual clean-up and never returned: the caller must
 // see the original error.
-func (s *ProjectConfigurationService) undoCreate(ctx context.Context, project *domain.Project, memberAdded bool) {
+//
+// RemoveMember is always attempted (it is idempotent): a timed-out AddMember
+// may still have written the role attribute.
+func (s *ProjectConfigurationService) undoCreate(ctx context.Context, project *domain.Project) {
 	ctx = context.WithoutCancel(ctx)
-	if memberAdded {
-		if err := s.directory.RemoveMember(ctx, project.GroupID, project.ID, project.CreatedBy); err != nil {
-			slog.Error("undo create project: remove creator failed", "project_id", project.ID, "group_id", project.GroupID, "error", err)
-		}
+	if err := s.directory.RemoveMember(ctx, project.GroupID, project.ID, project.CreatedBy); err != nil {
+		slog.Error("undo create project: remove creator failed", "project_id", project.ID, "group_id", project.GroupID, "error", err)
 	}
 	if err := s.directory.DeleteProjectGroup(ctx, project.GroupID); err != nil {
 		slog.Error("undo create project: delete group failed", "project_id", project.ID, "group_id", project.GroupID, "error", err)

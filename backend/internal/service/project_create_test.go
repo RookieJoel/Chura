@@ -92,10 +92,10 @@ func TestCreateProjectBoard_WritesInOrderAndUndoesInReverseOnFailure(t *testing.
 	}{
 		{"success", nil, nil, []string{create, add, repoCall}, nil},
 		{"group creation fails", map[string]error{"CreateProjectGroup": errKeycloak}, nil, []string{create}, domain.ErrUnavailable},
-		{"member add fails", map[string]error{"AddMember": errKeycloak}, nil, []string{create, add, del}, domain.ErrUnavailable},
+		{"member add fails", map[string]error{"AddMember": errKeycloak}, nil, []string{create, add, remove, del}, domain.ErrUnavailable},
 		{"row insert fails", nil, errDB, []string{create, add, repoCall, remove, del}, errDB},
 		{"row insert fails and undo fails", map[string]error{"RemoveMember": errKeycloak, "DeleteProjectGroup": errKeycloak}, errDB, []string{create, add, repoCall, remove, del}, errDB},
-		{"member add fails and undo fails", map[string]error{"AddMember": errKeycloak, "DeleteProjectGroup": errors.New("also down")}, nil, []string{create, add, del}, domain.ErrUnavailable},
+		{"member add fails and undo fails", map[string]error{"AddMember": errKeycloak, "DeleteProjectGroup": errors.New("also down")}, nil, []string{create, add, remove, del}, domain.ErrUnavailable},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

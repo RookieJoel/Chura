@@ -10,11 +10,11 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Nerzal/gocloak/v13"
 
+	"github.com/RookieJoel/Chura/backend/internal/adapter/lockstripe"
 	"github.com/RookieJoel/Chura/backend/internal/domain"
 	"github.com/RookieJoel/Chura/backend/internal/port/out"
 )
@@ -23,7 +23,8 @@ const (
 	callTimeout      = 5 * time.Second
 	groupNamePrefix  = "project-"
 	roleAttrPrefix   = "chura_project_role_"
-	maxGroupMembers  = 500
+	memberPageSize   = 100
+	maxGroupMembers  = 10_000 // hard ceiling; beyond it ListMembers fails rather than truncating
 	realmRoleMember  = "member"
 	realmRoleAuditor = "auditor"
 )
@@ -42,7 +43,7 @@ type Directory struct {
 	tokens *tokenSource
 	// userLocks serialises attribute read-modify-write per user within this
 	// process: the Admin API replaces the whole attribute map on PUT.
-	userLocks sync.Map // user id -> *sync.Mutex
+	userLocks *lockstripe.Set
 }
 
 var _ out.ProjectDirectory = (*Directory)(nil)
@@ -50,12 +51,44 @@ var _ out.ProjectDirectory = (*Directory)(nil)
 func NewDirectory(cfg Config) *Directory {
 	client := gocloak.NewClient(cfg.BaseURL)
 	return &Directory{
-		client: client,
-		realm:  cfg.Realm,
+		client:    client,
+		realm:     cfg.Realm,
+		userLocks: lockstripe.New(),
 		tokens: &tokenSource{
 			client: client, realm: cfg.Realm, clientID: cfg.ClientID, clientSecret: cfg.ClientSecret,
 			now: time.Now,
 		},
+	}
+}
+
+var errTooManyMembers = errors.New("group has more members than the supported maximum")
+
+// classify turns a Keycloak 404 into domain.ErrNotFound; other errors pass through unchanged.
+func classify(err error) error {
+	var apiErr *gocloak.APIError
+	if errors.As(err, &apiErr) && apiErr.Code == 404 {
+		return fmt.Errorf("keycloak resource: %w", domain.ErrNotFound)
+	}
+	return err
+}
+
+// collectPages gathers every item by calling fetch(first, max) page by page
+// until a page is shorter than pageSize. Exceeding ceiling is an error, never
+// a silently truncated result.
+func collectPages[T any](fetch func(first, max int) ([]T, error), pageSize, ceiling int) ([]T, error) {
+	var all []T
+	for first := 0; ; first += pageSize {
+		page, err := fetch(first, pageSize)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, page...)
+		if len(all) > ceiling {
+			return nil, errTooManyMembers
+		}
+		if len(page) < pageSize {
+			return all, nil
+		}
 	}
 }
 
@@ -70,8 +103,12 @@ func (d *Directory) call(ctx context.Context, op string, fn func(ctx context.Con
 	if err == nil {
 		err = fn(ctx, token)
 	}
-	if err == nil || errors.Is(err, domain.ErrNotFound) {
-		return err
+	err = classify(err)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, domain.ErrNotFound) {
+		return fmt.Errorf("keycloak %s: %w", op, err)
 	}
 	var apiErr *gocloak.APIError
 	if errors.As(err, &apiErr) && apiErr.Code == 401 {
@@ -97,10 +134,15 @@ func (d *Directory) CreateProjectGroup(ctx context.Context, projectID string) (s
 	return groupID, err
 }
 
+// DeleteProjectGroup is idempotent: an already-missing group is success.
 func (d *Directory) DeleteProjectGroup(ctx context.Context, groupID string) error {
-	return d.call(ctx, "delete group", func(ctx context.Context, token string) error {
+	err := d.call(ctx, "delete group", func(ctx context.Context, token string) error {
 		return d.client.DeleteGroup(ctx, token, d.realm, groupID)
 	})
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil
+	}
+	return err
 }
 
 func (d *Directory) FindUserByEmail(ctx context.Context, email string) (domain.DirectoryUser, error) {
@@ -161,10 +203,13 @@ func displayName(u *gocloak.User) string {
 func (d *Directory) ListMembers(ctx context.Context, groupID, projectID string) ([]domain.Member, error) {
 	var members []domain.Member
 	err := d.call(ctx, "list group members", func(ctx context.Context, token string) error {
-		users, err := d.client.GetGroupMembers(ctx, token, d.realm, groupID, gocloak.GetGroupsParams{
-			BriefRepresentation: gocloak.BoolP(false),
-			Max:                 gocloak.IntP(maxGroupMembers),
-		})
+		users, err := collectPages(func(first, max int) ([]*gocloak.User, error) {
+			return d.client.GetGroupMembers(ctx, token, d.realm, groupID, gocloak.GetGroupsParams{
+				BriefRepresentation: gocloak.BoolP(false),
+				First:               gocloak.IntP(first),
+				Max:                 gocloak.IntP(max),
+			})
+		}, memberPageSize, maxGroupMembers)
 		if err != nil {
 			return err
 		}
@@ -216,13 +261,18 @@ func (d *Directory) SetMemberRole(ctx context.Context, projectID, userID string,
 	})
 }
 
+// RemoveMember is idempotent: a missing user or group is success.
 func (d *Directory) RemoveMember(ctx context.Context, groupID, projectID, userID string) error {
-	return d.call(ctx, "remove member", func(ctx context.Context, token string) error {
+	err := d.call(ctx, "remove member", func(ctx context.Context, token string) error {
 		if err := d.writeRoleAttribute(ctx, token, projectID, userID, ""); err != nil {
 			return err
 		}
 		return d.client.DeleteUserFromGroup(ctx, token, d.realm, userID, groupID)
 	})
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil
+	}
+	return err
 }
 
 // writeRoleAttribute sets (or, for an empty value, deletes) the user's Project
@@ -231,10 +281,11 @@ func (d *Directory) RemoveMember(ctx context.Context, groupID, projectID, userID
 // under a per-user mutex so concurrent writes for one user do not overwrite
 // each other.
 func (d *Directory) writeRoleAttribute(ctx context.Context, token, projectID, userID, value string) error {
-	lock, _ := d.userLocks.LoadOrStore(userID, &sync.Mutex{})
-	mu := lock.(*sync.Mutex)
-	mu.Lock()
-	defer mu.Unlock()
+	unlock, err := d.userLocks.Lock(ctx, userID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	user, err := d.client.GetUserByID(ctx, token, d.realm, userID)
 	if err != nil {
 		return err

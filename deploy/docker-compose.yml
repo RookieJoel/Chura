@@ -6,7 +6,7 @@ x-agile-execution-environment: &agile-execution-environment
   KC_BASE_URL: http://keycloak:8080
   KC_REALM: chura
   KC_BACKEND_CLIENT_ID: chura-backend
-  KC_BACKEND_CLIENT_SECRET: ${KC_BACKEND_CLIENT_SECRET:-chura-backend-dev-secret}
+  KC_BACKEND_CLIENT_SECRET: ${KC_BACKEND_CLIENT_SECRET:?set KC_BACKEND_CLIENT_SECRET (dev value is in backend/.env.example)}
 
 name: chura-agile-execution-service
 services:

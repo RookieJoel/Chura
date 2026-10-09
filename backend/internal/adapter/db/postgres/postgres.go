@@ -2,10 +2,17 @@ package postgres
 
 import (
 	"fmt"
+	"time"
 
 	gormpostgres "gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+)
+
+const (
+	maxOpenConns    = 25
+	maxIdleConns    = 25
+	connMaxLifetime = 30 * time.Minute
 )
 
 func NewGormDB(databaseURL string) (*gorm.DB, error) {
@@ -20,6 +27,10 @@ func NewGormDB(databaseURL string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("access database handle: %w", err)
 	}
+
+	sqlDB.SetMaxOpenConns(maxOpenConns)
+	sqlDB.SetMaxIdleConns(maxIdleConns)
+	sqlDB.SetConnMaxLifetime(connMaxLifetime)
 
 	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("ping database: %w", err)
