@@ -93,7 +93,7 @@ func TestCreateProject_Returns201WithProjectJSON(t *testing.T) {
 	if status != 201 {
 		t.Fatalf("status = %d, want 201 (%v)", status, body)
 	}
-	if wantActor := (domain.Actor{UserID: "u1", Role: domain.SystemRoleTeamMember}); gotActor != wantActor {
+	if wantActor := (domain.Actor{UserID: "u1", Email: "u1@example.com", Role: domain.SystemRoleTeamMember}); gotActor != wantActor {
 		t.Fatalf("actor = %+v, want %+v", gotActor, wantActor)
 	}
 	if wantInput := (in.CreateProjectInput{Name: "Chura", Description: "d", TemplateID: "se"}); gotInput != wantInput {
@@ -169,7 +169,7 @@ func TestCreateProject_InvalidInput_Returns400WithViolationsArray(t *testing.T) 
 	}
 }
 
-func TestProjectRoutes_MissingActorHeaders_Return401(t *testing.T) {
+func TestProjectRoutes_MissingActor_Return401(t *testing.T) {
 	app := projectApp(stubProjectService{})
 
 	postStatus, _ := send(t, app, nethttp.MethodPost, "/api/v1/projects", `{}`, nil)

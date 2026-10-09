@@ -12,7 +12,7 @@ import (
 
 const validatePath = "/api/v1/projects/11111111-1111-4111-8111-111111111111/work-items/validate"
 
-var teamHeaders = map[string]string{"X-User-ID": "u1", "X-User-Role": "team_member"}
+var teamHeaders = map[string]string{"X-Test-Actor-ID": "u1", "X-Test-Actor-Email": "u1@example.com", "X-Test-Actor-Role": "team_member"}
 
 func TestValidateWorkItem_Valid_Returns200WithEmptyViolations(t *testing.T) {
 	var gotActor domain.Actor
@@ -40,7 +40,7 @@ func TestValidateWorkItem_Valid_Returns200WithEmptyViolations(t *testing.T) {
 	if !reflect.DeepEqual(gotAttrs, wantAttrs) {
 		t.Fatalf("attrs = %+v, want %+v", gotAttrs, wantAttrs)
 	}
-	if gotActor != (domain.Actor{UserID: "u1", Role: domain.SystemRoleTeamMember}) || gotProjectID != "11111111-1111-4111-8111-111111111111" {
+	if gotActor != (domain.Actor{UserID: "u1", Email: "u1@example.com", Role: domain.SystemRoleTeamMember}) || gotProjectID != "11111111-1111-4111-8111-111111111111" {
 		t.Fatalf("actor/project = %+v / %s", gotActor, gotProjectID)
 	}
 }
@@ -71,7 +71,7 @@ func TestValidateWorkItem_MalformedJSON_Returns400(t *testing.T) {
 	}
 }
 
-func TestValidateWorkItem_WithoutActorHeaders_Returns401(t *testing.T) {
+func TestValidateWorkItem_WithoutActor_Returns401(t *testing.T) {
 	app := projectApp(stubProjectService{})
 
 	status, _ := send(t, app, "POST", validatePath, `{"type":"task","title":"x"}`, nil)
@@ -101,21 +101,6 @@ func TestValidateWorkItem_ServiceErrors_MapToStatus(t *testing.T) {
 				t.Fatalf("status = %d, want %d", status, tc.status)
 			}
 		})
-	}
-}
-
-func TestActorHeaders_AreTrimmedBeforeUse(t *testing.T) {
-	var gotActor domain.Actor
-	app := projectApp(stubProjectService{validateFn: func(a domain.Actor, _ string, _ domain.WorkItemAttributes) (domain.ValidationResult, error) {
-		gotActor = a
-		return domain.ValidationResult{Valid: true, Violations: []domain.Violation{}}, nil
-	}})
-
-	status, _ := send(t, app, "POST", validatePath, `{"type":"task","title":"x"}`,
-		map[string]string{"X-User-ID": " u1 ", "X-User-Role": " team_member "})
-
-	if status != 200 || gotActor != (domain.Actor{UserID: "u1", Role: domain.SystemRoleTeamMember}) {
-		t.Fatalf("status = %d, actor = %+v", status, gotActor)
 	}
 }
 

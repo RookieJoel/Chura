@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	sprintAuditor   = domain.Actor{UserID: "a1", Role: domain.SystemRoleAuditor}
+	sprintAuditor   = domain.Actor{UserID: "a1", Email: "a1@example.com", Role: domain.SystemRoleAuditor}
 	hiddenProjectGW = &fakeGateway{err: fmt.Errorf("project %s: %w", sprintProjectID, domain.ErrNotFound)}
 )
 
@@ -107,7 +107,7 @@ func TestGetSprint_ErrorCases(t *testing.T) {
 		gw    *fakeGateway
 		want  error
 	}{
-		{"unauthenticated", domain.Actor{UserID: "u1", Role: "admin"}, "1", visibleGateway(), domain.ErrUnauthenticated},
+		{"unauthenticated", domain.Actor{UserID: "u1", Email: "u1@example.com", Role: "admin"}, "1", visibleGateway(), domain.ErrUnauthenticated},
 		{"unknown sprint", memberActor, "99", visibleGateway(), domain.ErrNotFound},
 		{"non-member hides existence", memberActor, "1", hiddenProjectGW, domain.ErrNotFound},
 	}

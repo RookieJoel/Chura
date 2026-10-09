@@ -198,13 +198,13 @@ func TestValidateWorkItemAttributes_MultipleViolations_AreInStableFieldOrder(t *
 }
 
 func TestValidateWorkItemAttributes_AsAuditor_IsAllowed(t *testing.T) {
-	_, got, err := validateIn(t, "se", domain.Actor{UserID: "a1", Role: domain.SystemRoleAuditor}, domain.WorkItemAttributes{Type: domain.WorkItemTypeTask, Title: "Do it"})
+	_, got, err := validateIn(t, "se", domain.Actor{UserID: "a1", Email: "a1@example.com", Role: domain.SystemRoleAuditor}, domain.WorkItemAttributes{Type: domain.WorkItemTypeTask, Title: "Do it"})
 
 	assertResult(t, got, err, domain.ValidationResult{Valid: true, Violations: noViolations})
 }
 
 func TestValidateWorkItemAttributes_AsNonMember_IsNotFound(t *testing.T) {
-	_, _, err := validateIn(t, "se", domain.Actor{UserID: "u2", Role: domain.SystemRoleTeamMember}, domain.WorkItemAttributes{Type: domain.WorkItemTypeTask, Title: "Do it"})
+	_, _, err := validateIn(t, "se", domain.Actor{UserID: "u2", Email: "u2@example.com", Role: domain.SystemRoleTeamMember}, domain.WorkItemAttributes{Type: domain.WorkItemTypeTask, Title: "Do it"})
 
 	if !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("want ErrNotFound, got %v", err)
@@ -212,7 +212,7 @@ func TestValidateWorkItemAttributes_AsNonMember_IsNotFound(t *testing.T) {
 }
 
 func TestValidateWorkItemAttributes_UnauthenticatedActor_IsRejected(t *testing.T) {
-	_, _, err := validateIn(t, "se", domain.Actor{UserID: "u1", Role: "admin"}, domain.WorkItemAttributes{Type: domain.WorkItemTypeTask, Title: "Do it"})
+	_, _, err := validateIn(t, "se", domain.Actor{UserID: "u1", Email: "u1@example.com", Role: "admin"}, domain.WorkItemAttributes{Type: domain.WorkItemTypeTask, Title: "Do it"})
 
 	if !errors.Is(err, domain.ErrUnauthenticated) {
 		t.Fatalf("want ErrUnauthenticated, got %v", err)

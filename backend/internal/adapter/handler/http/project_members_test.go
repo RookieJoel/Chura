@@ -21,7 +21,7 @@ func TestAddMember_Returns201WithProjectJSON(t *testing.T) {
 	if status != 201 {
 		t.Fatalf("status = %d, want 201 (%v)", status, body)
 	}
-	if wantActor := (domain.Actor{UserID: "u1", Role: domain.SystemRoleTeamMember}); gotActor != wantActor {
+	if wantActor := (domain.Actor{UserID: "u1", Email: "u1@example.com", Role: domain.SystemRoleTeamMember}); gotActor != wantActor {
 		t.Fatalf("actor = %+v, want %+v", gotActor, wantActor)
 	}
 	if gotProjectID != sampleProject.ID || gotUserID != "u2" || body["id"] != sampleProject.ID {
@@ -67,7 +67,7 @@ func TestAddMember_ErrorsMapToStatus(t *testing.T) {
 	}
 }
 
-func TestMemberRoutes_MissingActorHeaders_Return401(t *testing.T) {
+func TestMemberRoutes_MissingActor_Return401(t *testing.T) {
 	app := projectApp(stubProjectService{})
 
 	postStatus, _ := send(t, app, nethttp.MethodPost, "/api/v1/projects/"+sampleProject.ID+"/members", `{"user_id":"u2"}`, nil)
@@ -92,7 +92,7 @@ func TestAssignRole_Returns200WithProjectJSON(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("status = %d, want 200 (%v)", status, body)
 	}
-	if wantActor := (domain.Actor{UserID: "u1", Role: domain.SystemRoleTeamMember}); gotActor != wantActor {
+	if wantActor := (domain.Actor{UserID: "u1", Email: "u1@example.com", Role: domain.SystemRoleTeamMember}); gotActor != wantActor {
 		t.Fatalf("actor = %+v, want %+v", gotActor, wantActor)
 	}
 	if gotProjectID != sampleProject.ID || gotUserID != "u2" || gotRole != "scrum_master" || body["id"] != sampleProject.ID {

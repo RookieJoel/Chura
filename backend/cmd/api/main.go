@@ -78,7 +78,7 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	workitempb.RegisterWorkItemServiceServer(grpcServer, workitemgrpc.NewServer(workItemService))
-	grpcListener, err := net.Listen("tcp", ":9000")
+	grpcListener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func main() {
 		}
 	}()
 
-	grpcConnection, err := grpc.NewClient("localhost:9000", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	grpcConnection, err := grpc.NewClient("localhost:"+cfg.GRPCPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -66,7 +66,7 @@ func TestCreateSprint_Returns201WithProjectID(t *testing.T) {
 	if status != 201 || body["id"] != "7" || body["project_id"] != sprintProjectID {
 		t.Fatalf("status=%d body=%v", status, body)
 	}
-	if gotActor != (domain.Actor{UserID: "u1", Role: domain.SystemRoleTeamMember}) {
+	if gotActor != (domain.Actor{UserID: "u1", Email: "u1@example.com", Role: domain.SystemRoleTeamMember}) {
 		t.Fatalf("actor = %+v", gotActor)
 	}
 	if gotSprint.ProjectID != sprintProjectID || gotSprint.Name != "Sprint 1" || gotSprint.Team != "Alpha" {
@@ -74,7 +74,7 @@ func TestCreateSprint_Returns201WithProjectID(t *testing.T) {
 	}
 }
 
-func TestCreateSprint_WithoutActorHeadersIs401(t *testing.T) {
+func TestCreateSprint_WithoutActorIs401(t *testing.T) {
 	called := false
 	app := sprintApp(stubSprintService{createFn: func(domain.Actor, *domain.Sprint) (*domain.Sprint, error) {
 		called = true
@@ -149,7 +149,7 @@ func TestListSprints_MissingProjectIDViolationIs400WithViolations(t *testing.T) 
 	}
 }
 
-func TestSprintRoutes_WithoutActorHeadersAre401(t *testing.T) {
+func TestSprintRoutes_WithoutActorAre401(t *testing.T) {
 	app := sprintApp(stubSprintService{})
 	routes := []struct{ method, path, body string }{
 		{nethttp.MethodGet, "/api/v1/sprints?project_id=" + sprintProjectID, ""},

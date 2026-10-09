@@ -10,6 +10,7 @@ type config struct {
 	DatabaseURL     string
 	FrontendURL     string
 	Port            string
+	GRPCPort        string
 	KeycloakJWKSURL string
 	MongoURI        string
 	MongoDatabase   string
@@ -24,6 +25,7 @@ func loadConfig() (config, error) {
 		DatabaseURL:     os.Getenv("DATABASE_URL"),
 		FrontendURL:     os.Getenv("FRONTEND_URL"),
 		Port:            os.Getenv("PORT"),
+		GRPCPort:        os.Getenv("GRPC_PORT"),
 		KeycloakJWKSURL: os.Getenv("KC_JWKS_ENDPOINT"),
 		MongoURI:        os.Getenv("MONGODB_URI"),
 		MongoDatabase:   os.Getenv("MONGODB_DATABASE"),
@@ -43,6 +45,9 @@ func loadConfig() (config, error) {
 	}
 	if cfg.Port == "" {
 		cfg.Port = "8080"
+	}
+	if cfg.GRPCPort == "" {
+		cfg.GRPCPort = "9000"
 	}
 	if cfg.MongoDatabase == "" {
 		cfg.MongoDatabase = "chura"

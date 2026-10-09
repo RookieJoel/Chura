@@ -160,7 +160,7 @@ func TestCreateProjectBoard_SeveralViolations_AreAllReportedInFieldOrder(t *test
 
 func TestCreateProjectBoard_Auditor_IsForbidden(t *testing.T) {
 	repo := newFakeProjectRepo()
-	auditor := domain.Actor{UserID: "a1", Role: domain.SystemRoleAuditor}
+	auditor := domain.Actor{UserID: "a1", Email: "a1@example.com", Role: domain.SystemRoleAuditor}
 
 	_, err := newProjectService(repo).CreateProjectBoard(context.Background(), auditor,
 		in.CreateProjectInput{Name: "ok", TemplateID: "se"})

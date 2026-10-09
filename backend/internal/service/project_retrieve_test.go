@@ -40,7 +40,7 @@ func TestRetrieveProjectData_AsMember_ReturnsProject(t *testing.T) {
 func TestRetrieveProjectData_AsAuditor_ReturnsProject(t *testing.T) {
 	_, created, retrieve := seededService(t)
 
-	got, err := retrieve(domain.Actor{UserID: "a1", Role: domain.SystemRoleAuditor}, seededProjectID)
+	got, err := retrieve(domain.Actor{UserID: "a1", Email: "a1@example.com", Role: domain.SystemRoleAuditor}, seededProjectID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestRetrieveProjectData_AsAuditor_ReturnsProject(t *testing.T) {
 func TestRetrieveProjectData_AsNonMemberTeamMember_IsNotFound(t *testing.T) {
 	_, _, retrieve := seededService(t)
 
-	_, err := retrieve(domain.Actor{UserID: "u2", Role: domain.SystemRoleTeamMember}, seededProjectID)
+	_, err := retrieve(domain.Actor{UserID: "u2", Email: "u2@example.com", Role: domain.SystemRoleTeamMember}, seededProjectID)
 
 	if !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("want ErrNotFound, got %v", err)
@@ -82,7 +82,7 @@ func TestRetrieveProjectData_UnknownProject_IsNotFound(t *testing.T) {
 func TestRetrieveProjectData_UnauthenticatedActor_IsRejected(t *testing.T) {
 	_, _, retrieve := seededService(t)
 
-	_, err := retrieve(domain.Actor{UserID: "u1", Role: "admin"}, seededProjectID)
+	_, err := retrieve(domain.Actor{UserID: "u1", Email: "u1@example.com", Role: "admin"}, seededProjectID)
 
 	if !errors.Is(err, domain.ErrUnauthenticated) {
 		t.Fatalf("want ErrUnauthenticated, got %v", err)

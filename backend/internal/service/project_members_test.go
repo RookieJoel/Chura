@@ -12,7 +12,7 @@ import (
 	"github.com/RookieJoel/Chura/backend/internal/service"
 )
 
-var auditor = domain.Actor{UserID: "a1", Role: domain.SystemRoleAuditor}
+var auditor = domain.Actor{UserID: "a1", Email: "a1@example.com", Role: domain.SystemRoleAuditor}
 
 // projectWithTemplate seeds a project (creator u1) from the given template.
 func projectWithTemplate(t *testing.T, templateID string) (*fakeProjectRepo, *service.ProjectConfigurationService) {
@@ -77,7 +77,7 @@ func TestAddProjectMember_OutsiderTeamMember_IsNotFound(t *testing.T) {
 	for _, templateID := range bothTemplates {
 		t.Run(templateID, func(t *testing.T) {
 			_, svc := projectWithTemplate(t, templateID)
-			outsider := domain.Actor{UserID: "u9", Role: domain.SystemRoleTeamMember}
+			outsider := domain.Actor{UserID: "u9", Email: "u9@example.com", Role: domain.SystemRoleTeamMember}
 
 			_, err := svc.AddProjectMember(context.Background(), outsider, seededProjectID, "u2")
 
@@ -138,7 +138,7 @@ func TestAddProjectMember_100RuneUserID_IsAccepted(t *testing.T) {
 func TestAddProjectMember_UnauthenticatedActor_IsRejected(t *testing.T) {
 	_, svc := projectWithTemplate(t, "se")
 
-	_, err := svc.AddProjectMember(context.Background(), domain.Actor{UserID: "u1", Role: "admin"}, seededProjectID, "u2")
+	_, err := svc.AddProjectMember(context.Background(), domain.Actor{UserID: "u1", Email: "u1@example.com", Role: "admin"}, seededProjectID, "u2")
 
 	if !errors.Is(err, domain.ErrUnauthenticated) {
 		t.Fatalf("want ErrUnauthenticated, got %v", err)
@@ -250,7 +250,7 @@ func TestAssignProjectRole_OutsiderTeamMember_IsNotFound(t *testing.T) {
 	for templateID, roles := range templateRoles {
 		t.Run(templateID, func(t *testing.T) {
 			_, svc := projectWithTemplate(t, templateID)
-			outsider := domain.Actor{UserID: "u9", Role: domain.SystemRoleTeamMember}
+			outsider := domain.Actor{UserID: "u9", Email: "u9@example.com", Role: domain.SystemRoleTeamMember}
 
 			_, err := svc.AssignProjectRole(context.Background(), outsider, seededProjectID, "u1", roles.other)
 
@@ -324,7 +324,7 @@ func TestAssignProjectRole_SameRole_IsNoOpSuccess(t *testing.T) {
 func TestAssignProjectRole_UnauthenticatedAndBadID(t *testing.T) {
 	_, svc := projectWithTemplate(t, "se")
 
-	_, unauthErr := svc.AssignProjectRole(context.Background(), domain.Actor{UserID: "u1", Role: "admin"}, seededProjectID, "u1", "developer")
+	_, unauthErr := svc.AssignProjectRole(context.Background(), domain.Actor{UserID: "u1", Email: "u1@example.com", Role: "admin"}, seededProjectID, "u1", "developer")
 	_, idErr := svc.AssignProjectRole(context.Background(), teamMember, "not-a-uuid", "u1", "developer")
 
 	if !errors.Is(unauthErr, domain.ErrUnauthenticated) || !errors.Is(idErr, domain.ErrInvalidID) {

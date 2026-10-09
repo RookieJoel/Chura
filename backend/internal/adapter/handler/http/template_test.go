@@ -40,7 +40,7 @@ func get(t *testing.T, app *fiber.App, path string, headers map[string]string) (
 	return resp.StatusCode, obj, arr
 }
 
-var memberHeaders = map[string]string{"X-User-ID": "u1", "X-User-Role": "team_member"}
+var memberHeaders = map[string]string{"X-Test-Actor-ID": "u1", "X-Test-Actor-Email": "u1@example.com", "X-Test-Actor-Role": "team_member"}
 
 func TestListTemplates_Returns200WithBothTemplates(t *testing.T) {
 	status, _, arr := get(t, newTestApp(), "/api/v1/templates", memberHeaders)
@@ -65,7 +65,7 @@ func TestListTemplates_Returns200WithBothTemplates(t *testing.T) {
 	}
 }
 
-func TestListTemplates_WithoutHeaders_Returns401(t *testing.T) {
+func TestListTemplates_WithoutActor_Returns401(t *testing.T) {
 	status, obj, _ := get(t, newTestApp(), "/api/v1/templates", nil)
 
 	if status != 401 {
@@ -103,29 +103,14 @@ func TestGetTemplate_UnknownID_Returns404(t *testing.T) {
 	}
 }
 
-func TestTemplates_InvalidHeaders_Return401(t *testing.T) {
-	cases := map[string]map[string]string{
-		"unknown role": {"X-User-ID": "u1", "X-User-Role": "admin"},
-		"blank user":   {"X-User-ID": "  ", "X-User-Role": "auditor"},
-		"missing role": {"X-User-ID": "u1"},
-	}
-	for name, headers := range cases {
-		for _, path := range []string{"/api/v1/templates", "/api/v1/templates/se"} {
-			if status, _, _ := get(t, newTestApp(), path, headers); status != 401 {
-				t.Errorf("%s %s: status = %d, want 401", name, path, status)
-			}
-		}
-	}
-}
-
 func TestAuditor_CanReadTemplates(t *testing.T) {
-	headers := map[string]string{"X-User-ID": "a1", "X-User-Role": "auditor"}
+	headers := map[string]string{"X-Test-Actor-ID": "a1", "X-Test-Actor-Email": "a1@example.com", "X-Test-Actor-Role": "auditor"}
 	if status, _, _ := get(t, newTestApp(), "/api/v1/templates", headers); status != 200 {
 		t.Fatalf("status = %d, want 200", status)
 	}
 }
 
-func TestCORS_AllowsActorHeaders(t *testing.T) {
+func TestCORS_AllowsAuthorizationHeader(t *testing.T) {
 	req := httptest.NewRequest(nethttp.MethodOptions, "/api/v1/templates", nil)
 	resp, err := newTestApp().Test(req)
 	if err != nil {
@@ -133,7 +118,7 @@ func TestCORS_AllowsActorHeaders(t *testing.T) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	want := "Content-Type, Authorization, X-User-ID, X-User-Role"
+	want := "Content-Type, Authorization"
 	if got := resp.Header.Get("Access-Control-Allow-Headers"); got != want {
 		t.Fatalf("Allow-Headers = %q, want %q", got, want)
 	}

@@ -10,7 +10,7 @@ import (
 	"github.com/RookieJoel/Chura/backend/internal/service"
 )
 
-var teamMember = domain.Actor{UserID: "u1", Role: domain.SystemRoleTeamMember}
+var teamMember = domain.Actor{UserID: "u1", Email: "u1@example.com", Role: domain.SystemRoleTeamMember}
 
 func TestGetAvailableTemplates_ExposesGeneralAndSE(t *testing.T) {
 	svc := service.NewProjectConfigurationService(newFakeProjectRepo())
@@ -79,7 +79,7 @@ func TestTemplates_UnauthenticatedActorRejected(t *testing.T) {
 	bad := []domain.Actor{
 		{UserID: "", Role: domain.SystemRoleTeamMember},
 		{UserID: "   ", Role: domain.SystemRoleAuditor},
-		{UserID: "u1", Role: "admin"},
+		{UserID: "u1", Email: "u1@example.com", Role: "admin"},
 	}
 	for _, actor := range bad {
 		if _, err := svc.GetAvailableTemplates(context.Background(), actor); !errors.Is(err, domain.ErrUnauthenticated) {

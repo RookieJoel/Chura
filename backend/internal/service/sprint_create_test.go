@@ -15,7 +15,7 @@ import (
 
 const sprintProjectID = "11111111-1111-4111-8111-111111111111"
 
-var memberActor = domain.Actor{UserID: "u1", Role: domain.SystemRoleTeamMember}
+var memberActor = domain.Actor{UserID: "u1", Email: "u1@example.com", Role: domain.SystemRoleTeamMember}
 
 func TestCreateSprint_PersistsSprintWithProjectID(t *testing.T) {
 	repo := &fakeSprintRepo{}
@@ -43,7 +43,7 @@ func TestCreateSprint_AuditorIsForbiddenAndGatewayNotCalled(t *testing.T) {
 	repo := &fakeSprintRepo{}
 	gw := &fakeGateway{project: &domain.Project{ID: sprintProjectID}}
 	svc := service.NewSprintService(repo, gw)
-	auditor := domain.Actor{UserID: "a1", Role: domain.SystemRoleAuditor}
+	auditor := domain.Actor{UserID: "a1", Email: "a1@example.com", Role: domain.SystemRoleAuditor}
 
 	_, err := svc.CreateSprint(context.Background(), auditor,
 		&domain.Sprint{ProjectID: sprintProjectID, Name: "Sprint 1", Team: "Alpha"})

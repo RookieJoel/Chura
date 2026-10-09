@@ -6,9 +6,12 @@ info:
 servers:
   - url: http://localhost:8080
     description: Local development
+security:
+  - bearerAuth: []
 paths:
   /health:
     get:
+      security: []
       summary: Health check
       operationId: getHealth
       responses:
@@ -18,7 +21,6 @@ paths:
     get:
       summary: List available Templates (getAvailableTemplates)
       operationId: getAvailableTemplates
-      security: [{ actorUserId: [], actorRole: [] }]
       responses:
         "200":
           description: Templates
@@ -28,11 +30,11 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Template" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/v1/templates/{templateId}:
     get:
       summary: Retrieve a Template definition (retrieveTemplateDefinition)
       operationId: retrieveTemplateDefinition
-      security: [{ actorUserId: [], actorRole: [] }]
       parameters:
         - { name: templateId, in: path, required: true, schema: { type: string, example: se } }
       responses:
@@ -42,12 +44,12 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Template" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/projects:
     post:
       summary: Create a Project / Project Board (createProjectBoard). Team Member only.
       operationId: createProjectBoard
-      security: [{ actorUserId: [], actorRole: [] }]
       requestBody:
         required: true
         content:
@@ -66,7 +68,6 @@ paths:
     get:
       summary: Retrieve Project data (retrieveProjectData). Members and Auditors only; other Team Members get 404.
       operationId: retrieveProjectData
-      security: [{ actorUserId: [], actorRole: [] }]
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
       responses:
@@ -77,12 +78,12 @@ paths:
               schema: { $ref: "#/components/schemas/Project" }
         "400": { $ref: "#/components/responses/InvalidInput" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/projects/{projectId}/members:
     post:
       summary: Add a member with the Template's default role (addProjectMember). Project members only.
       operationId: addProjectMember
-      security: [{ actorUserId: [], actorRole: [] }]
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
       requestBody:
@@ -109,7 +110,6 @@ paths:
     put:
       summary: Assign a Project Role to a member (assignProjectRole). Project members only. The last holder of the creator role cannot be moved off it.
       operationId: assignProjectRole
-      security: [{ actorUserId: [], actorRole: [] }]
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
         - { name: userId, in: path, required: true, schema: { type: string } }
@@ -137,7 +137,6 @@ paths:
     post:
       summary: Validate Work Item attributes against the Project's Template (validateWorkItemAttributes). Persists nothing; valid=false is still 200.
       operationId: validateWorkItemAttributes
-      security: [{ actorUserId: [], actorRole: [] }]
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
       requestBody:
@@ -153,13 +152,13 @@ paths:
               schema: { $ref: "#/components/schemas/ValidationResult" }
         "400": { $ref: "#/components/responses/InvalidInput" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "413": { description: Request body larger than 1 MiB }
   /api/v1/sprints:
     post:
       summary: Create a Sprint inside a Project (createSprint). Team Member who belongs to the Project only.
       operationId: createSprint
-      security: [{ actorUserId: [], actorRole: [] }]
       requestBody:
         required: true
         content:
@@ -178,7 +177,6 @@ paths:
     get:
       summary: List the Sprints of one Project (listSprints). Project members and Auditors only; other Team Members get 404.
       operationId: listSprints
-      security: [{ actorUserId: [], actorRole: [] }]
       parameters:
         - name: project_id
           in: query
@@ -195,6 +193,7 @@ paths:
                 items: { $ref: "#/components/schemas/Sprint" }
         "400": { $ref: "#/components/responses/InvalidInput" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/sprints/{sprintId}:
     parameters:
@@ -202,7 +201,6 @@ paths:
     get:
       summary: Retrieve a Sprint (getSprint). Members of its Project and Auditors only; anyone else gets 404.
       operationId: getSprint
-      security: [{ actorUserId: [], actorRole: [] }]
       responses:
         "200":
           description: Sprint
@@ -210,11 +208,11 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Sprint" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     put:
       summary: Update a Sprint (updateSprint). Team Members who belong to its Project only; project_id is immutable and ignored.
       operationId: updateSprint
-      security: [{ actorUserId: [], actorRole: [] }]
       requestBody:
         required: true
         content:
@@ -233,29 +231,39 @@ paths:
     delete:
       summary: Delete a Sprint (deleteSprint). Team Members who belong to its Project only.
       operationId: deleteSprint
-      security: [{ actorUserId: [], actorRole: [] }]
       responses:
         "204":
           description: Deleted
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/whoami:
+    get:
+      summary: Identity of the authenticated caller
+      operationId: whoAmI
+      responses:
+        "200":
+          description: Claims of the caller's token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authenticated: { type: boolean }
+                  user_id: { type: string }
+                  email: { type: string }
+                  roles: { type: array, items: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-    # TEMPORARY placeholder until the real authentication feature lands.
-    # Trusts the caller completely; never expose publicly.
-    actorUserId:
-      type: apiKey
-      in: header
-      name: X-User-ID
-    actorRole:
-      type: apiKey
-      in: header
-      name: X-User-Role
-      description: team_member or auditor
+      bearerFormat: JWT
+      description: >-
+        Keycloak access token. The realm role `member` acts as Team Member and
+        `auditor` as Auditor; an account with neither or both roles gets 403.
   parameters:
     ProjectId:
       name: projectId
@@ -271,12 +279,12 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     Unauthenticated:
-      description: Missing or invalid X-User-ID / X-User-Role. `error` is "unauthenticated".
+      description: Missing, malformed or expired bearer token, or missing/blank `sub` or `email` claim. `error` is "unauthenticated".
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     Forbidden:
-      description: Role not allowed for this action (e.g. Auditor mutating). `error` is "forbidden".
+      description: Account has no Chura role or both (`member` and `auditor`), or the role is not allowed for this action (e.g. Auditor mutating). `error` is "forbidden".
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }

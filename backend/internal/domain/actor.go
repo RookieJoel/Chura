@@ -14,13 +14,17 @@ const (
 
 type Actor struct {
 	UserID string
+	Email  string
 	Role   SystemRole
 }
 
-// Validate reports ErrUnauthenticated for a blank user id or unknown role.
+// Validate reports ErrUnauthenticated for a blank user id, blank email or unknown role.
 func (a Actor) Validate() error {
 	if strings.TrimSpace(a.UserID) == "" {
 		return fmt.Errorf("missing user id: %w", ErrUnauthenticated)
+	}
+	if strings.TrimSpace(a.Email) == "" {
+		return fmt.Errorf("missing email: %w", ErrUnauthenticated)
 	}
 	if a.Role != SystemRoleTeamMember && a.Role != SystemRoleAuditor {
 		return fmt.Errorf("unknown role %q: %w", a.Role, ErrUnauthenticated)
