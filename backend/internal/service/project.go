@@ -152,7 +152,7 @@ func (s *ProjectConfigurationService) AddProjectMember(ctx context.Context, acto
 			return err
 		}
 		if _, isMember := project.MemberByID(user.ID); isMember {
-			return fmt.Errorf("user %q is already a member: %w", user.ID, domain.ErrConflict)
+			return fmt.Errorf("user %q is already a member: %w", user.ID, domain.ErrAlreadyMember)
 		}
 		return s.directory.AddMember(ctx, project.GroupID, project.ID, user.ID, template.DefaultRole)
 	})

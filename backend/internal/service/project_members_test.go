@@ -97,8 +97,8 @@ func TestAddProjectMember_AlreadyMember_IsConflict(t *testing.T) {
 
 			_, err := svc.AddProjectMember(context.Background(), teamMember, seededProjectID, "u1@example.com")
 
-			if !errors.Is(err, domain.ErrConflict) {
-				t.Fatalf("want ErrConflict, got %v", err)
+			if !errors.Is(err, domain.ErrAlreadyMember) || !errors.Is(err, domain.ErrConflict) {
+				t.Fatalf("want ErrAlreadyMember (a conflict), got %v", err)
 			}
 		})
 	}

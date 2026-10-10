@@ -18,6 +18,10 @@ var (
 	// one of its members. It wraps ErrForbidden, so errors.Is matches both;
 	// transports that know it map it to a more specific message first.
 	ErrNotProjectMember = fmt.Errorf("not a project member: %w", ErrForbidden)
+
+	// ErrAlreadyMember means the user being added already belongs to the
+	// Project. It wraps ErrConflict, so errors.Is matches both.
+	ErrAlreadyMember = fmt.Errorf("already a project member: %w", ErrConflict)
 )
 
 // Violation describes one invalid field.

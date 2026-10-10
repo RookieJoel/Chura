@@ -115,7 +115,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "409":
-          description: The person is already a member of the Project. `error` is "conflict".
+          description: The person is already a member of the Project. `error` is "user is already a member of this project".
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }

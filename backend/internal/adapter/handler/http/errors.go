@@ -33,6 +33,7 @@ var publicErrors = []struct {
 	{domain.ErrNotProjectMember, fiber.StatusForbidden, "you are not a member of this project"},
 	{domain.ErrForbidden, fiber.StatusForbidden, "forbidden"},
 	{domain.ErrNotFound, fiber.StatusNotFound, "not found"},
+	{domain.ErrAlreadyMember, fiber.StatusConflict, "user is already a member of this project"},
 	{domain.ErrConflict, fiber.StatusConflict, "conflict"},
 	{domain.ErrUnavailable, fiber.StatusServiceUnavailable, "service unavailable"},
 }
