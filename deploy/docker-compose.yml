@@ -77,7 +77,8 @@ services:
     # set shared memory limit when using docker compose
     shm_size: 128mb
     ports:
-      - "5432:5432"
+      # host port follows DATABASE_URL in backend/.env (Makefile passes CHURA_PG_PORT)
+      - "${CHURA_PG_PORT:-5432}:5432"
     volumes:
       - agile-execution-postgres-data:/var/lib/postgresql/
     environment:
