@@ -203,11 +203,11 @@ func TestValidateWorkItemAttributes_AsAuditor_IsAllowed(t *testing.T) {
 	assertResult(t, got, err, domain.ValidationResult{Valid: true, Violations: noViolations})
 }
 
-func TestValidateWorkItemAttributes_AsNonMember_IsNotFound(t *testing.T) {
+func TestValidateWorkItemAttributes_AsNonMember_IsNotProjectMember(t *testing.T) {
 	_, _, err := validateIn(t, "se", domain.Actor{UserID: "u2", Email: "u2@example.com", Role: domain.SystemRoleTeamMember}, domain.WorkItemAttributes{Type: domain.WorkItemTypeTask, Title: "Do it"})
 
-	if !errors.Is(err, domain.ErrNotFound) {
-		t.Fatalf("want ErrNotFound, got %v", err)
+	if !errors.Is(err, domain.ErrNotProjectMember) || !errors.Is(err, domain.ErrForbidden) || errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("want ErrNotProjectMember (and ErrForbidden), got %v", err)
 	}
 }
 

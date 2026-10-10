@@ -108,7 +108,7 @@ func TestCreateSprint_NonUUIDProjectIDIsInvalidID(t *testing.T) {
 	}
 }
 
-func TestCreateSprint_UnknownOrOutsiderProjectIsNotFound(t *testing.T) {
+func TestCreateSprint_UnknownProjectIsNotFound(t *testing.T) {
 	repo := &fakeSprintRepo{}
 	gw := &fakeGateway{err: fmt.Errorf("project %s: %w", sprintProjectID, domain.ErrNotFound)}
 	svc := service.NewSprintService(repo, gw)
@@ -118,6 +118,22 @@ func TestCreateSprint_UnknownOrOutsiderProjectIsNotFound(t *testing.T) {
 
 	if !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+	if repo.createCalls != 0 {
+		t.Fatalf("repo.Create called %d times, want 0", repo.createCalls)
+	}
+}
+
+func TestCreateSprint_OutsiderProjectIsNotProjectMember(t *testing.T) {
+	repo := &fakeSprintRepo{}
+	gw := &fakeGateway{err: fmt.Errorf("project %s: %w", sprintProjectID, domain.ErrNotProjectMember)}
+	svc := service.NewSprintService(repo, gw)
+
+	_, err := svc.CreateSprint(context.Background(), memberActor,
+		&domain.Sprint{ProjectID: sprintProjectID, Name: "Sprint 1", Team: "Alpha"})
+
+	if !errors.Is(err, domain.ErrNotProjectMember) || !errors.Is(err, domain.ErrForbidden) || errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("want ErrNotProjectMember (and ErrForbidden), got %v", err)
 	}
 	if repo.createCalls != 0 {
 		t.Fatalf("repo.Create called %d times, want 0", repo.createCalls)

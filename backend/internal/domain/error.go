@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 )
 
 var (
@@ -12,6 +13,11 @@ var (
 	ErrForbidden       = errors.New("forbidden")
 	ErrConflict        = errors.New("conflict")
 	ErrUnavailable     = errors.New("unavailable")
+
+	// ErrNotProjectMember means the Project exists but the Team Member is not
+	// one of its members. It wraps ErrForbidden, so errors.Is matches both;
+	// transports that know it map it to a more specific message first.
+	ErrNotProjectMember = fmt.Errorf("not a project member: %w", ErrForbidden)
 )
 
 // Violation describes one invalid field.

@@ -96,7 +96,8 @@ func TestCreateSprint_MapsServiceErrorsToStatus(t *testing.T) {
 		status int
 	}{
 		{"auditor forbidden", fmt.Errorf("create sprint: %w", domain.ErrForbidden), 403},
-		{"project not visible", fmt.Errorf("project x: %w", domain.ErrNotFound), 404},
+		{"project not found", fmt.Errorf("project x: %w", domain.ErrNotFound), 404},
+		{"not a project member", fmt.Errorf("project x: %w", domain.ErrNotProjectMember), 403},
 		{"bad project id", fmt.Errorf("project id: %w", domain.ErrInvalidID), 400},
 		{"invalid sprint", fmt.Errorf("%w: name is required", domain.ErrInvalidInput), 400},
 		{"missing project_id", &domain.InvalidInputError{Violations: []domain.Violation{{Field: "project_id", Message: "project_id is required"}}}, 400},

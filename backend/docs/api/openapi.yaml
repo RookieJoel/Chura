@@ -67,7 +67,7 @@ paths:
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/projects/{projectId}:
     get:
-      summary: Retrieve Project data (retrieveProjectData). Members and Auditors only; other Team Members get 404.
+      summary: Retrieve Project data (retrieveProjectData). Members and Auditors only; other Team Members get 403 "you are not a member of this project".
       operationId: retrieveProjectData
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -79,7 +79,7 @@ paths:
               schema: { $ref: "#/components/schemas/Project" }
         "400": { $ref: "#/components/responses/InvalidInput" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/projects/{projectId}/members:
@@ -108,9 +108,9 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
         "404":
-          description: Unknown Project (or one the caller does not belong to), or no user with this email.
+          description: Unknown Project, or no user with this email.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -144,7 +144,7 @@ paths:
               schema: { $ref: "#/components/schemas/Project" }
         "400": { $ref: "#/components/responses/InvalidInput" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
@@ -167,7 +167,7 @@ paths:
               schema: { $ref: "#/components/schemas/ValidationResult" }
         "400": { $ref: "#/components/responses/InvalidInput" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
         "404": { $ref: "#/components/responses/NotFound" }
         "413": { description: Request body larger than 1 MiB }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
@@ -188,11 +188,11 @@ paths:
               schema: { $ref: "#/components/schemas/Sprint" }
         "400": { $ref: "#/components/responses/InvalidInput" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
     get:
-      summary: List the Sprints of one Project (listSprints). Project members and Auditors only; other Team Members get 404.
+      summary: List the Sprints of one Project (listSprints). Project members and Auditors only; other Team Members get 403 "you are not a member of this project".
       operationId: listSprints
       parameters:
         - name: project_id
@@ -210,14 +210,14 @@ paths:
                 items: { $ref: "#/components/schemas/Sprint" }
         "400": { $ref: "#/components/responses/InvalidInput" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/sprints/{sprintId}:
     parameters:
       - { name: sprintId, in: path, required: true, schema: { type: string, example: "7" } }
     get:
-      summary: Retrieve a Sprint (getSprint). Members of its Project and Auditors only; anyone else gets 404.
+      summary: Retrieve a Sprint (getSprint). Members of its Project and Auditors only; Team Members outside the Project get 403 "you are not a member of this project".
       operationId: getSprint
       responses:
         "200":
@@ -226,7 +226,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Sprint" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
     put:
@@ -245,7 +245,7 @@ paths:
               schema: { $ref: "#/components/schemas/Sprint" }
         "400": { $ref: "#/components/responses/InvalidInput" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
     delete:
@@ -255,7 +255,7 @@ paths:
         "204":
           description: Deleted
         "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/whoami:
@@ -309,8 +309,17 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
+    NotProjectMember:
+      description: >-
+        Either the caller is a Team Member who is not a member of this Project
+        (`error` is "you are not a member of this project"), or the action is
+        not allowed for the caller's role, e.g. an Auditor writing (`error` is
+        "forbidden"). Auditors can see every Project.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
     NotFound:
-      description: Not found, or a Project (or its Sprint) the Team Member does not belong to. `error` is "not found".
+      description: The resource (Project, Sprint, Template, user or member) does not exist. `error` is "not found".
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }

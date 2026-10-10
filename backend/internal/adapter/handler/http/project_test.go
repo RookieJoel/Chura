@@ -226,6 +226,7 @@ func TestGetProject_ErrorsMapToStatus(t *testing.T) {
 		wantStatus int
 	}{
 		{"not found", fmt.Errorf("project x: %w", domain.ErrNotFound), 404},
+		{"not a project member", fmt.Errorf("project x: %w", domain.ErrNotProjectMember), 403},
 		{"bad id", fmt.Errorf("project id: %w", domain.ErrInvalidID), 400},
 		{"keycloak unavailable", fmt.Errorf("list members: %w", domain.ErrUnavailable), 503},
 	}
@@ -253,6 +254,7 @@ func TestProjectErrors_UseFixedPublicMessages(t *testing.T) {
 		{fmt.Errorf("project 1234 (secret): %w", domain.ErrNotFound), 404, "not found"},
 		{fmt.Errorf("add member: duplicate key value violates unique constraint: %w", domain.ErrConflict), 409, "conflict"},
 		{fmt.Errorf("project x: only team members may modify it: %w", domain.ErrForbidden), 403, "forbidden"},
+		{fmt.Errorf("project 1234 (secret): %w", domain.ErrNotProjectMember), 403, "you are not a member of this project"},
 		{fmt.Errorf("unknown role %q: %w", "root", domain.ErrUnauthenticated), 401, "unauthenticated"},
 		{fmt.Errorf("project id %q: %w", "<script>", domain.ErrInvalidID), 400, "invalid id"},
 		{fmt.Errorf("something: %w", domain.ErrInvalidInput), 400, "invalid input"},

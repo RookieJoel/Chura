@@ -142,7 +142,8 @@ func (s *SprintService) DeleteSprint(
 }
 
 // loadVisible returns the sprint when the actor may see its Project; sprints
-// of Projects the actor cannot see are reported as ErrNotFound.
+// of Projects the actor is not a member of fail with ErrNotProjectMember
+// (from the gateway); a missing sprint or Project is ErrNotFound.
 func (s *SprintService) loadVisible(ctx context.Context, actor domain.Actor, id string) (*domain.Sprint, error) {
 	if err := actor.Validate(); err != nil {
 		return nil, err

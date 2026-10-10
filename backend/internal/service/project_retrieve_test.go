@@ -63,7 +63,7 @@ func TestRetrieveProjectData_ReadsMembersFromDirectoryOnEveryRequest(t *testing.
 	s.dir.members["group-1"] = nil // removed in Keycloak between requests
 	_, err := s.svc.RetrieveProjectData(ctx, teamMember, seededProjectID)
 
-	if !errors.Is(err, domain.ErrNotFound) {
+	if !errors.Is(err, domain.ErrNotProjectMember) {
 		t.Fatalf("removed member must lose access on the next request, got %v", err)
 	}
 }
@@ -80,13 +80,13 @@ func TestRetrieveProjectData_AsAuditor_SeesAnyProject(t *testing.T) {
 	}
 }
 
-func TestRetrieveProjectData_AsNonMemberTeamMember_IsNotFound(t *testing.T) {
+func TestRetrieveProjectData_AsNonMemberTeamMember_IsNotProjectMember(t *testing.T) {
 	_, _, retrieve := seededService(t)
 
 	_, err := retrieve(domain.Actor{UserID: "u2", Email: "u2@example.com", Role: domain.SystemRoleTeamMember}, seededProjectID)
 
-	if !errors.Is(err, domain.ErrNotFound) {
-		t.Fatalf("want ErrNotFound, got %v", err)
+	if !errors.Is(err, domain.ErrNotProjectMember) || !errors.Is(err, domain.ErrForbidden) || errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("want ErrNotProjectMember (and ErrForbidden), got %v", err)
 	}
 }
 

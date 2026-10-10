@@ -13,7 +13,7 @@ import (
 
 var (
 	sprintAuditor   = domain.Actor{UserID: "a1", Email: "a1@example.com", Role: domain.SystemRoleAuditor}
-	hiddenProjectGW = &fakeGateway{err: fmt.Errorf("project %s: %w", sprintProjectID, domain.ErrNotFound)}
+	hiddenProjectGW = &fakeGateway{err: fmt.Errorf("project %s: %w", sprintProjectID, domain.ErrNotProjectMember)}
 )
 
 func seededSprints() *fakeSprintRepo {
@@ -68,7 +68,7 @@ func TestListSprints_RejectsBadActorBadIDAndHiddenProject(t *testing.T) {
 	}{
 		{"unauthenticated", domain.Actor{}, sprintProjectID, visibleGateway(), domain.ErrUnauthenticated},
 		{"non-uuid", memberActor, "nope", visibleGateway(), domain.ErrInvalidID},
-		{"non-member", memberActor, sprintProjectID, hiddenProjectGW, domain.ErrNotFound},
+		{"non-member", memberActor, sprintProjectID, hiddenProjectGW, domain.ErrNotProjectMember},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -109,7 +109,7 @@ func TestGetSprint_ErrorCases(t *testing.T) {
 	}{
 		{"unauthenticated", domain.Actor{UserID: "u1", Email: "u1@example.com", Role: "admin"}, "1", visibleGateway(), domain.ErrUnauthenticated},
 		{"unknown sprint", memberActor, "99", visibleGateway(), domain.ErrNotFound},
-		{"non-member hides existence", memberActor, "1", hiddenProjectGW, domain.ErrNotFound},
+		{"non-member", memberActor, "1", hiddenProjectGW, domain.ErrNotProjectMember},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -148,7 +148,7 @@ func TestUpdateSprint_ErrorCasesDoNotPersist(t *testing.T) {
 		{"auditor forbidden", sprintAuditor, "1", visibleGateway(), domain.ErrForbidden},
 		{"auditor unknown sprint", sprintAuditor, "99", visibleGateway(), domain.ErrNotFound},
 		{"unknown sprint", memberActor, "99", visibleGateway(), domain.ErrNotFound},
-		{"non-member", memberActor, "1", hiddenProjectGW, domain.ErrNotFound},
+		{"non-member", memberActor, "1", hiddenProjectGW, domain.ErrNotProjectMember},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -207,7 +207,7 @@ func TestDeleteSprint_ErrorCasesDoNotDelete(t *testing.T) {
 		{"auditor forbidden", sprintAuditor, "1", visibleGateway(), domain.ErrForbidden},
 		{"auditor unknown sprint", sprintAuditor, "99", visibleGateway(), domain.ErrNotFound},
 		{"unknown sprint", memberActor, "99", visibleGateway(), domain.ErrNotFound},
-		{"non-member", memberActor, "1", hiddenProjectGW, domain.ErrNotFound},
+		{"non-member", memberActor, "1", hiddenProjectGW, domain.ErrNotProjectMember},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

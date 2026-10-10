@@ -19,7 +19,7 @@ type errorResponse struct {
 var errInvalidJSONBody = fmt.Errorf("invalid JSON body: %w", domain.ErrInvalidInput)
 
 // publicErrors maps each client-error sentinel to its status and fixed public
-// message. Order matters: the first match wins. Internal error text (ids,
+// message. Order matters: the first match wins, so specific sentinels precede the ones they wrap. Internal error text (ids,
 // driver messages) never reaches the response.
 var publicErrors = []struct {
 	target  error
@@ -30,6 +30,7 @@ var publicErrors = []struct {
 	{domain.ErrInvalidID, fiber.StatusBadRequest, "invalid id"},
 	{domain.ErrInvalidInput, fiber.StatusBadRequest, "invalid input"},
 	{domain.ErrUnauthenticated, fiber.StatusUnauthorized, "unauthenticated"},
+	{domain.ErrNotProjectMember, fiber.StatusForbidden, "you are not a member of this project"},
 	{domain.ErrForbidden, fiber.StatusForbidden, "forbidden"},
 	{domain.ErrNotFound, fiber.StatusNotFound, "not found"},
 	{domain.ErrConflict, fiber.StatusConflict, "conflict"},

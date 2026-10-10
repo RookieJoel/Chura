@@ -229,7 +229,7 @@ func (s *ProjectConfigurationService) RetrieveProjectData(ctx context.Context, a
 
 // loadVisible loads a project the actor may see: validated actor, well-formed
 // id, then Auditors see everything and Team Members only their own projects
-// (existence of others is hidden behind ErrNotFound).
+// (a non-member gets ErrNotProjectMember; a missing project is ErrNotFound).
 func (s *ProjectConfigurationService) loadVisible(ctx context.Context, actor domain.Actor, projectID string) (*domain.Project, error) {
 	if err := actor.Validate(); err != nil {
 		return nil, err
@@ -248,7 +248,7 @@ func (s *ProjectConfigurationService) loadVisible(ctx context.Context, actor dom
 		return project, nil
 	}
 	if _, isMember := project.MemberByID(actor.UserID); !isMember {
-		return nil, fmt.Errorf("project %s: %w", projectID, domain.ErrNotFound)
+		return nil, fmt.Errorf("project %s: %w", projectID, domain.ErrNotProjectMember)
 	}
 	return project, nil
 }

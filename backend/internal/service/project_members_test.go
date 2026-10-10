@@ -75,7 +75,7 @@ func TestAddProjectMember_Auditor_IsForbidden(t *testing.T) {
 	}
 }
 
-func TestAddProjectMember_OutsiderTeamMember_IsNotFound(t *testing.T) {
+func TestAddProjectMember_OutsiderTeamMember_IsNotProjectMember(t *testing.T) {
 	for _, templateID := range bothTemplates {
 		t.Run(templateID, func(t *testing.T) {
 			_, svc := projectWithTemplate(t, templateID)
@@ -83,8 +83,8 @@ func TestAddProjectMember_OutsiderTeamMember_IsNotFound(t *testing.T) {
 
 			_, err := svc.AddProjectMember(context.Background(), outsider, seededProjectID, "u2@example.com")
 
-			if !errors.Is(err, domain.ErrNotFound) {
-				t.Fatalf("want ErrNotFound, got %v", err)
+			if !errors.Is(err, domain.ErrNotProjectMember) || !errors.Is(err, domain.ErrForbidden) || errors.Is(err, domain.ErrNotFound) {
+				t.Fatalf("want ErrNotProjectMember (and ErrForbidden), got %v", err)
 			}
 		})
 	}
@@ -423,7 +423,7 @@ func TestAssignProjectRole_Auditor_IsForbidden(t *testing.T) {
 	}
 }
 
-func TestAssignProjectRole_OutsiderTeamMember_IsNotFound(t *testing.T) {
+func TestAssignProjectRole_OutsiderTeamMember_IsNotProjectMember(t *testing.T) {
 	for templateID, roles := range templateRoles {
 		t.Run(templateID, func(t *testing.T) {
 			_, svc := projectWithTemplate(t, templateID)
@@ -431,8 +431,8 @@ func TestAssignProjectRole_OutsiderTeamMember_IsNotFound(t *testing.T) {
 
 			_, err := svc.AssignProjectRole(context.Background(), outsider, seededProjectID, "u1", roles.other)
 
-			if !errors.Is(err, domain.ErrNotFound) {
-				t.Fatalf("want ErrNotFound, got %v", err)
+			if !errors.Is(err, domain.ErrNotProjectMember) || !errors.Is(err, domain.ErrForbidden) || errors.Is(err, domain.ErrNotFound) {
+				t.Fatalf("want ErrNotProjectMember (and ErrForbidden), got %v", err)
 			}
 		})
 	}
