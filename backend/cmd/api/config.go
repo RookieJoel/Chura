@@ -7,12 +7,17 @@ import (
 )
 
 type config struct {
-	DatabaseURL     string
-	FrontendURL     string
-	Port            string
-	KeycloakJWKSURL string
-	MongoURI        string
-	MongoDatabase   string
+	DatabaseURL                 string
+	FrontendURL                 string
+	Port                        string
+	GRPCPort                    string
+	KeycloakJWKSURL             string
+	KeycloakBaseURL             string
+	KeycloakRealm               string
+	KeycloakBackendClientID     string
+	KeycloakBackendClientSecret string
+	MongoURI                    string
+	MongoDatabase               string
 }
 
 func loadConfig() (config, error) {
@@ -21,12 +26,17 @@ func loadConfig() (config, error) {
 	}
 
 	cfg := config{
-		DatabaseURL:     os.Getenv("DATABASE_URL"),
-		FrontendURL:     os.Getenv("FRONTEND_URL"),
-		Port:            os.Getenv("PORT"),
-		KeycloakJWKSURL: os.Getenv("KC_JWKS_ENDPOINT"),
-		MongoURI:        os.Getenv("MONGODB_URI"),
-		MongoDatabase:   os.Getenv("MONGODB_DATABASE"),
+		DatabaseURL:                 os.Getenv("DATABASE_URL"),
+		FrontendURL:                 os.Getenv("FRONTEND_URL"),
+		Port:                        os.Getenv("PORT"),
+		GRPCPort:                    os.Getenv("GRPC_PORT"),
+		KeycloakJWKSURL:             os.Getenv("KC_JWKS_ENDPOINT"),
+		KeycloakBaseURL:             os.Getenv("KC_BASE_URL"),
+		KeycloakRealm:               os.Getenv("KC_REALM"),
+		KeycloakBackendClientID:     os.Getenv("KC_BACKEND_CLIENT_ID"),
+		KeycloakBackendClientSecret: os.Getenv("KC_BACKEND_CLIENT_SECRET"),
+		MongoURI:                    os.Getenv("MONGODB_URI"),
+		MongoDatabase:               os.Getenv("MONGODB_DATABASE"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -34,6 +44,16 @@ func loadConfig() (config, error) {
 	}
 	if cfg.KeycloakJWKSURL == "" {
 		return config{}, fmt.Errorf("KC_JWKS_ENDPOINT is not set")
+	}
+	for name, value := range map[string]string{
+		"KC_BASE_URL":              cfg.KeycloakBaseURL,
+		"KC_REALM":                 cfg.KeycloakRealm,
+		"KC_BACKEND_CLIENT_ID":     cfg.KeycloakBackendClientID,
+		"KC_BACKEND_CLIENT_SECRET": cfg.KeycloakBackendClientSecret,
+	} {
+		if value == "" {
+			return config{}, fmt.Errorf("%s is not set", name)
+		}
 	}
 	if cfg.MongoURI == "" {
 		return config{}, fmt.Errorf("MONGODB_URI is not set")
@@ -43,6 +63,9 @@ func loadConfig() (config, error) {
 	}
 	if cfg.Port == "" {
 		cfg.Port = "8080"
+	}
+	if cfg.GRPCPort == "" {
+		cfg.GRPCPort = "9000"
 	}
 	if cfg.MongoDatabase == "" {
 		cfg.MongoDatabase = "chura"

@@ -19,6 +19,7 @@ type sprintModel struct {
 	StartDate *time.Time `gorm:"column:start_date"`
 	EndDate   *time.Time `gorm:"column:end_date"`
 	Status    string     `gorm:"column:status"`
+	ProjectID string     `gorm:"column:project_id;type:uuid"`
 }
 
 func (sprintModel) TableName() string {
@@ -30,6 +31,7 @@ const sprintIDClause = "id = ?"
 func (m *sprintModel) toDomain() domain.Sprint {
 	return domain.Sprint{
 		ID:        strconv.FormatUint(uint64(m.ID), 10),
+		ProjectID: m.ProjectID,
 		Name:      m.Name,
 		Team:      m.Team,
 		StartDate: m.StartDate,
@@ -56,6 +58,7 @@ func (r *SprintRepository) Create(
 ) (*domain.Sprint, error) {
 
 	model := sprintModel{
+		ProjectID: sprint.ProjectID,
 		Name:      sprint.Name,
 		Team:      sprint.Team,
 		StartDate: sprint.StartDate,
@@ -76,16 +79,16 @@ func (r *SprintRepository) GetByID(
 	id string,
 ) (*domain.Sprint, error) {
 
-	sprintID, err := strconv.ParseUint(id, 10, 64)
+	sprintID, err := parseSprintID(id)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	var model sprintModel
 
 	err = r.db.WithContext(ctx).First(&model, sprintIDClause, sprintID).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
+		return nil, fmt.Errorf("sprint %s: %w", id, domain.ErrNotFound)
 	}
 
 	if err != nil {
@@ -98,11 +101,13 @@ func (r *SprintRepository) GetByID(
 
 func (r *SprintRepository) List(
 	ctx context.Context,
+	projectID string,
 ) ([]domain.Sprint, error) {
 
 	var models []sprintModel
 
 	if err := r.db.WithContext(ctx).
+		Where("project_id = ?", projectID).
 		Order("start_date ASC NULLS LAST").
 		Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("list sprints: %w", err)
@@ -122,9 +127,9 @@ func (r *SprintRepository) Update(
 	sprint *domain.Sprint,
 ) (*domain.Sprint, error) {
 
-	sprintID, err := strconv.ParseUint(id, 10, 64)
+	sprintID, err := parseSprintID(id)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	updates := map[string]any{
@@ -146,12 +151,18 @@ func (r *SprintRepository) Update(
 	}
 
 	if result.RowsAffected == 0 {
-		return nil, nil
+		return nil, fmt.Errorf("sprint %s: %w", id, domain.ErrNotFound)
 	}
 
-	sprint.ID = strconv.FormatUint(sprintID, 10)
+	// project_id is immutable and not in the request body: reload the row so the
+	// response carries it.
+	var model sprintModel
+	if err := r.db.WithContext(ctx).First(&model, sprintIDClause, sprintID).Error; err != nil {
+		return nil, fmt.Errorf("reload sprint: %w", err)
+	}
 
-	return sprint, nil
+	updated := model.toDomain()
+	return &updated, nil
 }
 
 func (r *SprintRepository) Delete(
@@ -159,9 +170,9 @@ func (r *SprintRepository) Delete(
 	id string,
 ) error {
 
-	sprintID, err := strconv.ParseUint(id, 10, 64)
+	sprintID, err := parseSprintID(id)
 	if err != nil {
-		return gorm.ErrRecordNotFound
+		return err
 	}
 
 	result := r.db.WithContext(ctx).Delete(&sprintModel{}, sprintIDClause, sprintID)
@@ -170,8 +181,17 @@ func (r *SprintRepository) Delete(
 	}
 
 	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
+		return fmt.Errorf("sprint %s: %w", id, domain.ErrNotFound)
 	}
 
 	return nil
+}
+
+// parseSprintID maps a non-numeric id to ErrNotFound: no such sprint can exist.
+func parseSprintID(id string) (uint64, error) {
+	sprintID, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("sprint %q: %w", id, domain.ErrNotFound)
+	}
+	return sprintID, nil
 }
