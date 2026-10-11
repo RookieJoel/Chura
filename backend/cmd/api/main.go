@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net"
-	"os"
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/db"
@@ -19,34 +18,11 @@ import (
 	notificationmemory "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
 	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/RookieJoel/Chura/backend/internal/service"
-	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
-	if err := godotenv.Load(".env"); err != nil {
-		log.Printf("load .env: %v; using process environment", err)
-	}
-
-	databaseURL := os.Getenv("DATABASE_URL")
-
-	if databaseURL == "" {
-		log.Fatal("DATABASE_URL is not set")
-	}
-
-	frontendURL := os.Getenv("FRONTEND_URL")
-
-	if frontendURL == "" {
-		frontendURL = "http://localhost:3000"
-	}
-
-	port := os.Getenv("PORT")
-
-	if port == "" {
-		port = "8080"
-	}
-
 	cfg, err := loadConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -94,20 +70,16 @@ func main() {
 	var workItemRepository out.WorkItemRepository = connections.Mongo.WorkItemsrepository
 
 	notificationService := service.NewNotificationService(
-		notificationmemory.NotificationRecipientRepository{TestEmail: os.Getenv("TEST_EMAIL_TO")},
+		notificationmemory.NotificationRecipientRepository{TestEmail: cfg.TestEmail},
 		emailadapter.SMTPSender{
-			Host:     os.Getenv("SMTP_HOST"),
-			Port:     os.Getenv("SMTP_PORT"),
-			Username: os.Getenv("SMTP_USERNAME"),
-			Password: os.Getenv("SMTP_PASSWORD"),
-			From:     os.Getenv("SMTP_FROM"),
+			Host:     cfg.SMTPHost,
+			Port:     cfg.SMTPPort,
+			Username: cfg.SMTPUsername,
+			Password: cfg.SMTPPassword,
+			From:     cfg.SMTPFrom,
 		},
 	)
-	rabbitURL := os.Getenv("RABBITMQ_URL")
-	if rabbitURL == "" {
-		log.Fatal("RABBITMQ_URL is not set")
-	}
-	rabbitConnection, err := rabbitmq.Connect(rabbitURL)
+	rabbitConnection, err := rabbitmq.Connect(cfg.RabbitMQURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -119,11 +91,7 @@ func main() {
 	}
 	defer rabbitPublisher.Close()
 
-	notificationQueue := os.Getenv("RABBITMQ_NOTIFICATION_QUEUE")
-	if notificationQueue == "" {
-		notificationQueue = "chura-notifications"
-	}
-	notificationConsumer, err := rabbitmq.NewNotificationConsumer(rabbitConnection, notificationQueue)
+	notificationConsumer, err := rabbitmq.NewNotificationConsumer(rabbitConnection, cfg.RabbitMQNotificationQueue)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -156,7 +124,6 @@ func main() {
 
 	workitemhttp.RegisterNotificationWebSocket(app, notificationService)
 
-	log.Printf("server running on :%s", port)
 	log.Printf("server running on :%s", cfg.Port)
 
 	if err := app.Listen(":" + cfg.Port); err != nil {
