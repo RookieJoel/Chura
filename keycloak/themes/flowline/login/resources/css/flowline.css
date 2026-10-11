@@ -1,0 +1,222 @@
+/* ==========================================================================
+   Flowline v2 - Keycloak login theme
+   Layout: parallax stage (full bleed) + slanted form panel on the right.
+   Primary #D9577D   Accent #5B4BDB   Background #FFFFFF
+   ========================================================================== */
+
+:root {
+  --kc-pink:      #D9577D;
+  --kc-pink-deep: #C2446A;
+  --kc-pink-ink:  #B03A5F;   /* pink for small text on white */
+  --kc-accent:    #5B4BDB;
+  --kc-ink:       #1A1530;
+  --kc-muted:     #6B6580;
+  --kc-line:      #E4DEEC;
+  --kc-bg:        #FFFFFF;
+  --kc-angle:     -35deg;
+  --kc-slant:     -8deg;     /* lean of the panel edge */
+  --kc-font: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+
+  --pf-v5-global--primary-color--100: var(--kc-pink);
+  --pf-v5-global--primary-color--200: var(--kc-pink-deep);
+  --pf-v5-global--active-color--100:  var(--kc-pink);
+  --pf-v5-global--link--Color:        var(--kc-pink-ink);
+  --pf-v5-global--link--Color--hover: #8A2B4A;
+  --pf-v5-global--FontFamily--text:    var(--kc-font);
+  --pf-v5-global--FontFamily--heading: var(--kc-font);
+}
+
+/* kill every default Keycloak page background */
+html { color-scheme: light; background: var(--kc-bg) !important; background-image: none !important; overflow-x: hidden; }
+html body { background: transparent !important; background-image: none !important;
+            font-family: var(--kc-font); color: var(--kc-ink); -webkit-font-smoothing: antialiased; }
+
+/* ---------- Parallax stage ---------------------------------------------- */
+
+.fl-stage {
+  position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
+  -webkit-mask-image: radial-gradient(95% 110% at 28% 45%, #000 35%, rgba(0,0,0,.4) 100%);
+          mask-image: radial-gradient(95% 110% at 28% 45%, #000 35%, rgba(0,0,0,.4) 100%);
+}
+.fl-layer { position: absolute; inset: -100px; will-change: transform; }   /* margin for parallax travel */
+
+.fl-wash {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(55% 55% at 22% 18%, rgba(217, 87, 125, .16), transparent 70%),
+    radial-gradient(50% 50% at 40% 95%, rgba(91, 75, 219, .12), transparent 70%);
+}
+
+/* rotated field: grid rows and drifting lines share one axis */
+.fl-field {
+  position: absolute; inset: -60%;
+  transform: rotate(var(--kc-angle));
+  background-image: repeating-linear-gradient(to bottom, rgba(26,21,48,.06) 0 1px, transparent 1px 56px);
+}
+.kc-line {
+  --c: var(--kc-pink);
+  position: absolute; height: 2px; margin-top: -.5px; width: var(--len, 240px);
+  background: linear-gradient(90deg, transparent, var(--c));
+  border-radius: 2px; opacity: 0; will-change: transform, opacity;
+  animation: kc-drift var(--dur, 10s) linear var(--delay, 0s) infinite;
+}
+.kc-line::after {
+  content: ""; position: absolute; right: -1px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px;
+  border-radius: 50%; background: var(--c); box-shadow: 0 0 10px 2px var(--c);
+}
+.kc-line--accent { --c: var(--kc-accent); }
+@keyframes kc-drift {
+  0%   { transform: translate3d(0,0,0); opacity: 0; }
+  15%  { opacity: var(--peak, .85); }
+  100% { transform: translate3d(var(--travel, 700px),0,0); opacity: 0; }
+}
+
+/* floating shapes (layers b and c) */
+.fl-s {
+  --c: var(--kc-pink); --s: 100px; --r: 0deg;
+  position: absolute; width: var(--s); height: var(--s);
+  transform: rotate(var(--r));
+  animation: fl-bob var(--bd, 9s) ease-in-out var(--bdelay, 0s) infinite alternate;
+}
+.fl-s.is-accent { --c: var(--kc-accent); }
+@keyframes fl-bob {
+  from { transform: rotate(var(--r)) translateY(0); }
+  to   { transform: rotate(var(--r)) translateY(-16px); }
+}
+.fl-ring  { border: 1.5px solid var(--c); border-radius: 50%; opacity: .55; }
+.fl-slab  { height: calc(var(--s) * .36); border: 1.5px solid var(--c); opacity: .5; }
+.fl-fill  { border: 0; background: linear-gradient(135deg, var(--c), transparent 80%); opacity: .14; }
+.fl-dot   { border-radius: 50%; background: var(--c); }
+.fl-bar   { height: 3px; border-radius: 3px; background: linear-gradient(90deg, transparent, var(--c)); }
+.fl-bokeh { border-radius: 50%; background: radial-gradient(circle, var(--c), transparent 70%); opacity: .24; filter: blur(14px); }
+.fl-cross::before, .fl-cross::after { content: ""; position: absolute; background: var(--c); }
+.fl-cross::before { left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; }
+.fl-cross::after  { top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; }
+
+/* realm name, large, lives on the stage */
+.fl-hero { position: absolute; left: calc(100px + clamp(32px, 6vw, 96px)); bottom: calc(100px + clamp(32px, 9vh, 104px));
+           max-width: calc(100vw - 760px); }
+.fl-hero::before { content: ""; display: block; width: 72px; height: 3px; margin-bottom: 1.25rem; border-radius: 3px;
+                   background: linear-gradient(90deg, var(--kc-pink), var(--kc-accent)); transform: rotate(var(--kc-angle)); transform-origin: left; }
+.fl-hero b { display: block; font-weight: 300; font-size: clamp(2.75rem, 6.2vw, 6.25rem); line-height: .98;
+             letter-spacing: -.045em; color: var(--kc-ink); overflow-wrap: anywhere; }
+
+/* ---------- Form panel (replaces the Keycloak card) ---------------------- */
+
+:is(.pf-v5-c-login, .pf-v6-c-login) {
+  display: flex !important; justify-content: flex-end; align-items: stretch;
+  min-height: 100vh; padding: 0 !important;
+  background: transparent !important; background-image: none !important;
+}
+
+:is(.pf-v5-c-login__container, .pf-v6-c-login__container) {
+  position: relative; isolation: isolate;
+  display: flex !important; flex-direction: column; justify-content: center;
+  grid-template: none !important; max-width: none !important;
+  width: min(580px, 100%) !important; min-height: 100vh;
+  margin: 0 !important; padding: 3rem 3.5rem 3rem 4.5rem !important;
+  animation: fl-in .8s cubic-bezier(.2,.7,.2,1) both;
+}
+/* the slanted sheet */
+:is(.pf-v5-c-login__container, .pf-v6-c-login__container)::before {
+  content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: 0; right: -240px;
+  background: rgba(255,255,255,.94);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border-left: 3px solid var(--kc-pink);
+  border-image: linear-gradient(to bottom, var(--kc-pink), var(--kc-accent)) 1;
+  box-shadow: -40px 0 90px -30px rgba(217, 87, 125, .35);
+  transform: skewX(var(--kc-slant)); transform-origin: top left;
+}
+@keyframes fl-in { from { opacity: 0; transform: translateX(48px); } to { opacity: 1; transform: none; } }
+
+/* header becomes screen-reader only: the wordmark is on the stage */
+:is(.pf-v5-c-login__header, .pf-v6-c-login__header) {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+:is(.pf-v5-c-login__main, .pf-v6-c-login__main) {
+  width: 100%; margin: 0 !important; padding: 0 !important;
+  background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
+}
+:is(.pf-v5-c-login__main-header, .pf-v5-c-login__main-body, .pf-v5-c-login__main-footer,
+    .pf-v6-c-login__main-header, .pf-v6-c-login__main-body, .pf-v6-c-login__main-footer) {
+  padding-left: 0 !important; padding-right: 0 !important; background: transparent !important;
+}
+:is(.pf-v5-c-login__main-header, .pf-v6-c-login__main-header)::before {
+  content: ""; display: block; width: 34px; height: 3px; margin-bottom: 1.5rem; border-radius: 3px;
+  background: var(--kc-pink); transform: rotate(var(--kc-angle)); transform-origin: left;
+}
+#kc-page-title { font-size: 2.25rem; font-weight: 300; letter-spacing: -.035em; line-height: 1.1; color: var(--kc-ink); }
+
+/* ---------- Fields: underline style ------------------------------------- */
+
+:is(.pf-v5-c-form__label-text, .pf-v6-c-form__label-text) { font-size: .8125rem; font-weight: 500; color: var(--kc-muted); letter-spacing: .02em; }
+
+:is(.pf-v5-c-form-control, .pf-v6-c-form-control) {
+  position: relative; min-height: 48px;
+  background: transparent; border: 0; border-bottom: 1.5px solid var(--kc-line); border-radius: 0;
+  transition: border-color .2s ease;
+}
+:is(.pf-v5-c-form-control, .pf-v6-c-form-control)::before { display: none; }
+:is(.pf-v5-c-form-control, .pf-v6-c-form-control)::after {      /* animated focus line */
+  content: ""; display: block; position: absolute; inset: auto 0 -1.5px 0; width: 100%; height: 1.5px; border: 0;
+  background: linear-gradient(90deg, var(--kc-pink), var(--kc-accent));
+  transform: scaleX(0); transform-origin: left; transition: transform .35s cubic-bezier(.2,.7,.2,1);
+}
+:is(.pf-v5-c-form-control, .pf-v6-c-form-control):focus-within::after { transform: scaleX(1); }
+:is(.pf-v5-c-form-control, .pf-v6-c-form-control):hover { border-bottom-color: #CFC7DC; }
+:is(.pf-v5-c-form-control, .pf-v6-c-form-control) input,
+input:is(.pf-v5-c-form-control, .pf-v6-c-form-control) {
+  font-family: var(--kc-font); font-size: 1rem; color: var(--kc-ink); background: transparent; padding-left: 0;
+}
+input[type="checkbox"] { accent-color: var(--kc-pink); }
+
+/* primary button: cut corner + light sweep on hover */
+:is(.pf-v5-c-button.pf-m-primary, .pf-v6-c-button.pf-m-primary) {
+  position: relative; overflow: hidden; min-height: 52px;
+  font-family: var(--kc-font); font-size: 1rem; font-weight: 600; letter-spacing: .02em; color: #fff;
+  background: var(--kc-pink); border: 0; border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+  transition: background-color .2s ease, transform .2s ease;
+}
+:is(.pf-v5-c-button.pf-m-primary, .pf-v6-c-button.pf-m-primary)::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
+  transform: skewX(var(--kc-angle)) translateX(-120%); transition: transform .7s ease;
+}
+:is(.pf-v5-c-button.pf-m-primary, .pf-v6-c-button.pf-m-primary):hover { background: var(--kc-pink-deep); }
+:is(.pf-v5-c-button.pf-m-primary, .pf-v6-c-button.pf-m-primary):hover::before { transform: skewX(var(--kc-angle)) translateX(520%); }
+
+/* social / secondary */
+:is(.pf-v5-c-button.pf-m-control, .pf-v5-c-button.pf-m-secondary, .pf-v6-c-button.pf-m-secondary), #social-providers a {
+  border: 1px solid var(--kc-line); border-radius: 0; color: var(--kc-ink); background: transparent; transition: border-color .2s, color .2s;
+}
+:is(.pf-v5-c-button.pf-m-secondary, .pf-v6-c-button.pf-m-secondary):hover, #social-providers a:hover { border-color: var(--kc-accent); color: var(--kc-accent); }
+
+a { color: var(--kc-pink-ink); text-decoration: none; }
+a:hover { color: #8A2B4A; text-decoration: underline; text-underline-offset: 3px; }
+
+:is(.pf-v5-c-login__main-footer-band, .pf-v6-c-login__main-footer-band) {
+  background: transparent; border: 0; padding-left: 0; text-align: left; color: var(--kc-muted);
+}
+:is(.pf-v5-c-login__main-footer-links, .pf-v6-c-login__main-footer-links) { border-color: var(--kc-line); }
+:is(.pf-v5-c-alert, .pf-v6-c-alert) { border-radius: 0; }
+:focus-visible { outline: 2px solid var(--kc-accent); outline-offset: 2px; }
+
+/* ---------- Responsive & motion ----------------------------------------- */
+
+@media (max-width: 900px) {
+  .fl-hero { display: none; }
+  :is(.pf-v5-c-login__container, .pf-v6-c-login__container) { width: 100% !important; padding: 2.5rem 1.5rem !important; }
+  :is(.pf-v5-c-login__container, .pf-v6-c-login__container)::before {
+    right: 0; transform: none; border: 0; border-image: none; background: rgba(255,255,255,.9);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kc-line { display: none; }
+  .fl-s, :is(.pf-v5-c-login__container, .pf-v6-c-login__container) { animation: none; }
+}
+
+input:focus {
+    outline: none;
+}

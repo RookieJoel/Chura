@@ -2,6 +2,7 @@ import Link from "next/link";
 import { members } from "@/lib/mock-data";
 import { BellIcon, ChevronDownIcon, SearchIcon } from "@/components/icons";
 import { WorkItemAvatar } from "@/components/work-items/avatar";
+import { ProfileMenu } from "@/components/layout/profile-menu";
 
 export function TopNav() {
   return (
@@ -40,6 +41,7 @@ export function TopNav() {
           ))}
         </div>
         <BellIcon className="size-4 text-text-secondary" />
+        <ProfileMenu />
       </div>
     </header>
   );

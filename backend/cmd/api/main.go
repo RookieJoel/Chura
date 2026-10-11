@@ -5,16 +5,13 @@ import (
 	"net"
 	"os"
 
-	"github.com/RookieJoel/Chura/backend/internal/adapter/db"
-	memory "github.com/RookieJoel/Chura/backend/internal/adapter/db/postgres/repository"
-
 	emailadapter "github.com/RookieJoel/Chura/backend/internal/adapter/email"
-	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc"
-	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem"
+	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/grpc"
+	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem"
 	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
-	notificationmemory "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
-	"github.com/RookieJoel/Chura/backend/internal/port/out"
+	memory "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
 	"github.com/RookieJoel/Chura/backend/internal/service"
+	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -25,56 +22,15 @@ func main() {
 		log.Printf("load .env: %v; using process environment", err)
 	}
 
-	databaseURL := os.Getenv("DATABASE_URL")
+	app := fiber.New()
 
-	if databaseURL == "" {
-		log.Fatal("DATABASE_URL is not set")
-	}
+	app.Get("/health", func(c *fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusOK)
+	})
 
-	frontendURL := os.Getenv("FRONTEND_URL")
-
-	if frontendURL == "" {
-		frontendURL = "http://localhost:3000"
-	}
-
-	port := os.Getenv("PORT")
-
-	if port == "" {
-		port = "8080"
-	}
-
-	postgresDB, err := db.ConnectPostgresDB(databaseURL)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	mongoConnection, err := db.ConnectMongoDB()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	connections := &db.Connections{Postgres: postgresDB, Mongo: mongoConnection}
-	defer connections.Close()
-
-	sprintRepository := memory.NewSprintRepository(connections.Postgres)
-
-	sprintService := service.NewSprintService(
-		sprintRepository,
-	)
-
-	sprintHandler := workitemhttp.NewSprintHandler(
-		sprintService,
-	)
-
-	app := workitemhttp.NewRouter(
-		sprintHandler,
-		frontendURL,
-	)
-
-	var workItemRepository out.WorkItemRepository = connections.Mongo.WorkItemsrepository
-
+	workItemRepository := memory.NewWorkItemRepository()
 	notificationService := service.NewNotificationService(
-		notificationmemory.NotificationRecipientRepository{TestEmail: os.Getenv("TEST_EMAIL_TO")},
+		memory.NotificationRecipientRepository{TestEmail: os.Getenv("TEST_EMAIL_TO")},
 		emailadapter.SMTPSender{
 			Host:     os.Getenv("SMTP_HOST"),
 			Port:     os.Getenv("SMTP_PORT"),
@@ -108,9 +64,5 @@ func main() {
 
 	workitemhttp.RegisterNotificationWebSocket(app, notificationService)
 
-	log.Printf("server running on :%s", port)
-
-	if err := app.Listen(":" + port); err != nil {
-		log.Fatal(err)
-	}
+	log.Fatal(app.Listen(":8080"))
 }

@@ -16,7 +16,7 @@ project_name: "Chura"
 subprojects:
   - name: "backend"
     stack: "Go 1.25, Fiber v2, hexagonal architecture (internal/domain, internal/port/{in,out}, internal/service, internal/adapter/{http,postgres}), sqlc + pgx/v5, PostgreSQL, goose migrations"
-    default_branch: "main"
+    default_branch: "dev"
     gh_remote: "RookieJoel/Chura"
     build_cmd: "make -C backend build"
     lint_cmd: "make -C backend lint"
@@ -26,7 +26,7 @@ subprojects:
     codegen_output_dir: "backend/internal/adapter/postgres/sqlcgen"
   - name: "frontend"
     stack: "Next.js 16 (App Router), TypeScript, Tailwind CSS, Vitest + React Testing Library"
-    default_branch: "main"
+    default_branch: "dev"
     gh_remote: "RookieJoel/Chura"
     build_cmd: "pnpm --dir frontend build"
     lint_cmd: "pnpm --dir frontend lint"
@@ -46,6 +46,32 @@ uses_ralph_loop: false
 uses_mattpocock_skills: true
 local_reviewer_agent: omit
 ```
+
+## SE lenses (software-engineering-skills)
+
+Ten generic SDLC checklists live in `references/se-lenses/NN-<name>/{SKILL.md,CHECKLIST.md}`.
+They are **lenses, not phases**: read the named lens's `SKILL.md` (Workflow + Expected outputs)
+and run its `CHECKLIST.md` at the moment shown. The Chura pipeline, gates, glossary and
+Strict Rules always win on conflict; lenses add rigor, never new gates or new requirements.
+Delegate lens runs to sub-agents when they'd bloat main context.
+
+| Phase | Lens | Used for |
+|-------|------|----------|
+| P1 Grill | `01-requirements-engineering` | Ambiguity detection, conflicts, missing info → grilling questions; separate problem from solution |
+| P2 Spec | `01-requirements-engineering` | Testable acceptance criteria, business rules, NFRs, assumptions; requirement IDs for traceability |
+| P3 Design | `03-software-architecture`, `04-database-design`, `05-api-design` | Dependency direction & port boundaries; schema/constraints/indexes/transactions/migration rollback; endpoint catalog, validation, error contract, status codes |
+| P3 Design (only if new infra/integration) | `02-system-design` | Trust boundaries, failure modes. Usually skip — Chura is a single-service monolith |
+| P4 Tickets | `01-requirements-engineering`, `07-testing-qa` | Requirement → ticket traceability table; every AC maps to a test level |
+| P5 Implement | `07-testing-qa` (with `mattpocock-skills:tdd`) | Boundary + negative cases; lowest-cost test level. Bug found mid-story → `08-debugging-refactoring` (reproduce → root cause → minimal fix → regression test; refactor separately) |
+| P6 Review | `06-code-quality`, `07-testing-qa` (quality gate) | Feeds the `## Standards` axis and reviewer briefs |
+| P6 Review | `09-owasp-security` | **Mandatory** when `security_sensitive_domains` touched; otherwise a quick pass on input validation + access control for any new endpoint. Brief `security-reviewer` with its checklist |
+| P7 PR | `10-devops-cicd` | Confirm CI/Docker/migration-ordering/rollback notes in PR description when schema or env changes. Skip otherwise |
+
+Rules for using lenses:
+- Lens outputs fold into the existing artifacts (`spec.md`, `design.technical.md`, tickets, PR body) — don't create parallel docs.
+- A lens "Expected output" with no relevance to the feature is omitted, not padded.
+- Do not claim a checklist item passed unless you verified it (lens's own rule).
+- Lens language note: `PROMPTS-TH.md` templates were deliberately not imported.
 
 ## Hexagonal architecture notes (backend)
 
