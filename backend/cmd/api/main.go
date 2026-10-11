@@ -13,6 +13,7 @@ import (
 	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
 	workitemhttp "github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/identity/keycloak"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/messaging/rabbitmq"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/middleware"
 	notificationmemory "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
@@ -39,12 +40,27 @@ func main() {
 	}
 
 	connections := &db.Connections{Postgres: postgresDB, Mongo: mongoConnection}
-	defer connections.Close()
+	defer func() {
+		if err := connections.Close(); err != nil {
+			log.Printf("close connections: %v", err)
+		}
+	}()
 
 	sprintRepository := memory.NewSprintRepository(connections.Postgres)
 
+	projectService := service.NewProjectConfigurationService(
+		memory.NewProjectRepository(connections.Postgres),
+		keycloak.NewDirectory(keycloak.Config{
+			BaseURL:      cfg.KeycloakBaseURL,
+			Realm:        cfg.KeycloakRealm,
+			ClientID:     cfg.KeycloakBackendClientID,
+			ClientSecret: cfg.KeycloakBackendClientSecret,
+		}),
+	)
+
 	sprintService := service.NewSprintService(
 		sprintRepository,
+		projectService,
 	)
 
 	sprintHandler := workitemhttp.NewSprintHandler(
@@ -52,6 +68,8 @@ func main() {
 	)
 
 	authHandler := http.NewAuthHandler()
+	templateHandler := http.NewTemplateHandler(projectService)
+	projectHandler := http.NewProjectHandler(projectService)
 
 	jwks, err := keyfunc.NewDefault([]string{cfg.KeycloakJWKSURL})
 	if err != nil {
@@ -63,6 +81,8 @@ func main() {
 	app := http.NewRouter(
 		sprintHandler,
 		authHandler,
+		templateHandler,
+		projectHandler,
 		cfg.FrontendURL,
 		authMiddleware,
 	)
@@ -106,7 +126,7 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	workitempb.RegisterWorkItemServiceServer(grpcServer, workitemgrpc.NewServer(workItemService))
-	grpcListener, err := net.Listen("tcp", ":9000")
+	grpcListener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -116,7 +136,7 @@ func main() {
 		}
 	}()
 
-	grpcConnection, err := grpc.NewClient("localhost:9000", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	grpcConnection, err := grpc.NewClient("localhost:"+cfg.GRPCPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
 	}

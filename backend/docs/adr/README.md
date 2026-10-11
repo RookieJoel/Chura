@@ -32,4 +32,4 @@ Same table format as `proposal.md`'s ADRs:
 - [0003](0003-css-ui-framework.md) — Tailwind CSS
 - [0004](0004-workitem-api-architecture.md) — WorkItem API structure
 - [0005](0005-hexagonal-architecture.md) — Backend architecture pattern
-- [0006](0006-identity-provider-keycloak.md) — Identity provider
+- [0006](0006-identity-provider-keycloak.md) — Identity provider (amended 2026-10-09: Project membership and Project Role live in Keycloak)

@@ -23,6 +23,17 @@
       "attributes": {
         "post.logout.redirect.uris": "http://localhost:3000/*"
       }
+    },
+    {
+      "clientId": "chura-backend",
+      "name": "Chura backend (Admin API service account)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "secret": "chura-backend-dev-secret"
     }
   ],
   "roles": {
@@ -33,7 +44,7 @@
         "composite": false,
         "clientRole": false
       },
-            {
+      {
         "name": "member",
         "description": "member for chura",
         "composite": false,
@@ -57,7 +68,8 @@
       ],
       "realmRoles": [
         "auditor"
-      ]
+      ],
+      "emailVerified": true
     },
     {
       "username": "tonnam",
@@ -74,7 +86,51 @@
       ],
       "realmRoles": [
         "member"
+      ],
+      "emailVerified": true
+    },
+    {
+      "username": "pim",
+      "enabled": true,
+      "email": "pim@example.com",
+      "emailVerified": true,
+      "firstName": "Pim",
+      "lastName": "Test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "test1234",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "member"
       ]
+    },
+    {
+      "username": "service-account-chura-backend",
+      "enabled": true,
+      "serviceAccountClientId": "chura-backend",
+      "clientRoles": {
+        "realm-management": [
+          "view-users",
+          "manage-users",
+          "query-groups"
+        ]
+      }
     }
-  ]
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}}},{\"name\":\"email\",\"displayName\":\"${email}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"email\":{},\"length\":{\"max\":255}}},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}}},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}}}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}],\"unmanagedAttributePolicy\":\"ADMIN_EDIT\"}"
+          ]
+        }
+      }
+    ]
+  }
 }
