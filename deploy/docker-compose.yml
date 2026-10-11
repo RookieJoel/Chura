@@ -6,7 +6,6 @@ x-agile-execution-environment: &agile-execution-environment
   KC_BASE_URL: http://keycloak:8080
   KC_REALM: chura
   KC_BACKEND_CLIENT_ID: chura-backend
-  KC_BACKEND_CLIENT_SECRET: ${KC_BACKEND_CLIENT_SECRET:?set KC_BACKEND_CLIENT_SECRET (dev value is in backend/.env.example)}
 
 name: chura-agile-execution-service
 services:
@@ -28,16 +27,41 @@ services:
     networks:
       - agile-execution-mongodb
 
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: chura-agile-execution-rabbitmq
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-chura_dev}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-change_me_dev}
+    ports:
+      - "5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - agile-execution-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - agile-execution-api
+
   agile-execution-api:
     build:
       context: ../backend
       dockerfile: Dockerfile
     container_name: chura-agile-execution-api
+    env_file:
+      - ../backend/.env
     environment:
       <<: *agile-execution-environment
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-chura_dev}:${RABBITMQ_PASSWORD:-change_me_dev}@rabbitmq:5672/
       DATABASE_URL: postgresql://chura:admin@postgre-db:5432/chura
     depends_on:
       mongo-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       postgre-db:
         condition: service_healthy
@@ -86,7 +110,7 @@ services:
       POSTGRES_USER: chura
       POSTGRES_DB: chura
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready", "-h", "localhost", "-p", "5432", "-U", "chura"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U chura"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -111,6 +135,7 @@ services:
 
 volumes:
   agile-execution-mongodb-data:
+  agile-execution-rabbitmq-data:
   agile-execution-postgres-data:
     name: chura-agile-execution-postgres-data
 
