@@ -2,22 +2,6 @@ package domain
 
 import "time"
 
-const (
-	ReflectionWhatWentWell  = "what_went_well"
-	ReflectionWhatToImprove = "what_to_improve"
-	ReflectionActionItems   = "action_items"
-)
-
-// DefaultReflectionTemplate is the placeholder set of reflection attributes
-// until template definitions are provided by the Project Configuration Service.
-func DefaultReflectionTemplate() []string {
-	return []string{
-		ReflectionWhatWentWell,
-		ReflectionWhatToImprove,
-		ReflectionActionItems,
-	}
-}
-
 type SprintReflection struct {
 	ID        string            `json:"id"`
 	SprintID  string            `json:"sprint_id"`

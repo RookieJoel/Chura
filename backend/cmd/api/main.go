@@ -69,7 +69,7 @@ func main() {
 	analyticsService := service.NewAnalyticsService(
 		sprintRepository,
 		reflectionRepository,
-		metrics.NewMockWorkSummaryProvider(),
+		metrics.NewSprintWorkSummaryCalculator(),
 		exporter.NewCSVExporter(),
 	)
 

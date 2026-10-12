@@ -54,7 +54,7 @@ func newTestAnalytics(sprint *domain.Sprint, items []domain.SprintReflection) *A
 }
 
 func TestRetrieveSprintReflection(t *testing.T) {
-	items := []domain.SprintReflection{{ID: "1", SprintID: "1", Author: "a", Answers: map[string]string{domain.ReflectionWhatWentWell: "good"}}}
+	items := []domain.SprintReflection{{ID: "1", SprintID: "1", Author: "a", Answers: map[string]string{domain.ReflectionWentWell: "good"}}}
 	svc := newTestAnalytics(&domain.Sprint{ID: "1", Name: "S1"}, items)
 
 	got, err := svc.RetrieveSprintReflection(context.Background(), "1")

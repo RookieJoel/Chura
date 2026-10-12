@@ -35,7 +35,7 @@ func (e *CSVExporter) Export(summary *domain.SprintReviewSummary) ([]byte, error
 	}
 
 	for _, r := range summary.Qualitative.Reflections {
-		for _, key := range domain.DefaultReflectionTemplate() {
+		for _, key := range domain.DefaultReflectionTemplate().Attributes {
 			rows = append(rows, []string{
 				"reflection", r.Author, key, r.Answers[key], r.CreatedAt.Format(time.RFC3339),
 			})
