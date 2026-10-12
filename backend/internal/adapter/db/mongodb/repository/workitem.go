@@ -73,8 +73,15 @@ func (repository *WorkItemRepository) Get(id string) (domain.WorkItem, error) {
 	return domainFromDocument(document), nil
 }
 
-func (repository *WorkItemRepository) List(projectID string) ([]domain.WorkItem, error) {
-	return repository.find(context.Background(), bson.M{"project_id": projectID})
+func (repository *WorkItemRepository) List(filter out.WorkItemFilter) ([]domain.WorkItem, error) {
+	query := bson.M{}
+	if filter.ProjectID != "" {
+		query["project_id"] = filter.ProjectID
+	}
+	if filter.SprintID != "" {
+		query["sprint_id"] = filter.SprintID
+	}
+	return repository.find(context.Background(), query)
 }
 
 // ListBySprint returns the work items of projectID committed to sprintID.

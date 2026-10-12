@@ -18,11 +18,22 @@ type config struct {
 	KeycloakBackendClientSecret string
 	MongoURI                    string
 	MongoDatabase               string
+	SMTPHost                    string
+	SMTPPort                    string
+	SMTPUsername                string
+	SMTPPassword                string
+	SMTPFrom                    string
+	RabbitMQURL                 string
+	RabbitMQNotificationQueue   string
 }
 
 func loadConfig() (config, error) {
-	if err := LoadDotEnv(); err != nil {
-		log.Printf("no .env file loaded: %v", err)
+	envFile := os.Getenv("CHURA_ENV_FILE")
+	if envFile == "" {
+		envFile = ".env"
+	}
+	if err := LoadDotEnv(envFile); err != nil {
+		log.Printf("no environment file %q loaded: %v", envFile, err)
 	}
 
 	cfg := config{
@@ -37,6 +48,13 @@ func loadConfig() (config, error) {
 		KeycloakBackendClientSecret: os.Getenv("KC_BACKEND_CLIENT_SECRET"),
 		MongoURI:                    os.Getenv("MONGODB_URI"),
 		MongoDatabase:               os.Getenv("MONGODB_DATABASE"),
+		SMTPHost:                    os.Getenv("SMTP_HOST"),
+		SMTPPort:                    os.Getenv("SMTP_PORT"),
+		SMTPUsername:                os.Getenv("SMTP_USERNAME"),
+		SMTPPassword:                os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:                    os.Getenv("SMTP_FROM"),
+		RabbitMQURL:                 os.Getenv("RABBITMQ_URL"),
+		RabbitMQNotificationQueue:   os.Getenv("RABBITMQ_NOTIFICATION_QUEUE"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -58,6 +76,9 @@ func loadConfig() (config, error) {
 	if cfg.MongoURI == "" {
 		return config{}, fmt.Errorf("MONGODB_URI is not set")
 	}
+	if cfg.RabbitMQURL == "" {
+		return config{}, fmt.Errorf("RABBITMQ_URL is not set")
+	}
 	if cfg.FrontendURL == "" {
 		cfg.FrontendURL = "http://localhost:3000"
 	}
@@ -69,6 +90,9 @@ func loadConfig() (config, error) {
 	}
 	if cfg.MongoDatabase == "" {
 		cfg.MongoDatabase = "chura"
+	}
+	if cfg.RabbitMQNotificationQueue == "" {
+		cfg.RabbitMQNotificationQueue = "chura-notifications"
 	}
 
 	return cfg, nil

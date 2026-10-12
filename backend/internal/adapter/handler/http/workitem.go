@@ -53,6 +53,9 @@ func handleWorkItemMessage(gateway out.WorkItemGateway, message workItemMessage)
 		}
 		return workItemResponse{Operation: "listed", WorkItems: items}
 	case "update":
+		if strings.TrimSpace(message.WorkItem.ID) == "" {
+			message.WorkItem.ID = message.ID
+		}
 		item, err := gateway.UpdateWorkItem(message.WorkItem)
 		return responseForItem("updated", item, err)
 	case "delete":
