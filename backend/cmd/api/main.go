@@ -16,7 +16,6 @@ import (
 	"github.com/RookieJoel/Chura/backend/internal/adapter/identity/keycloak"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/messaging/rabbitmq"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/middleware"
-	notificationmemory "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
 	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/RookieJoel/Chura/backend/internal/service"
 	"google.golang.org/grpc"
@@ -47,15 +46,16 @@ func main() {
 	}()
 
 	sprintRepository := memory.NewSprintRepository(connections.Postgres)
+	directory := keycloak.NewDirectory(keycloak.Config{
+		BaseURL:      cfg.KeycloakBaseURL,
+		Realm:        cfg.KeycloakRealm,
+		ClientID:     cfg.KeycloakBackendClientID,
+		ClientSecret: cfg.KeycloakBackendClientSecret,
+	})
 
 	projectService := service.NewProjectConfigurationService(
 		memory.NewProjectRepository(connections.Postgres),
-		keycloak.NewDirectory(keycloak.Config{
-			BaseURL:      cfg.KeycloakBaseURL,
-			Realm:        cfg.KeycloakRealm,
-			ClientID:     cfg.KeycloakBackendClientID,
-			ClientSecret: cfg.KeycloakBackendClientSecret,
-		}),
+		directory,
 	)
 
 	sprintService := service.NewSprintService(
@@ -90,7 +90,7 @@ func main() {
 	var workItemRepository out.WorkItemRepository = connections.Mongo.WorkItemsrepository
 
 	notificationService := service.NewNotificationService(
-		notificationmemory.NotificationRecipientRepository{TestEmail: cfg.TestEmail},
+		keycloak.NewNotificationRecipientRepository(directory),
 		emailadapter.SMTPSender{
 			Host:     cfg.SMTPHost,
 			Port:     cfg.SMTPPort,
@@ -141,8 +141,6 @@ func main() {
 		log.Fatal(err)
 	}
 	http.RegisterWorkItemWebSocket(app, workitemgrpc.NewWorkItemGateway(grpcConnection))
-
-	workitemhttp.RegisterNotificationWebSocket(app, notificationService)
 
 	log.Printf("server running on :%s", cfg.Port)
 

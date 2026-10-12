@@ -18,7 +18,6 @@ type config struct {
 	KeycloakBackendClientSecret string
 	MongoURI                    string
 	MongoDatabase               string
-	TestEmail                   string
 	SMTPHost                    string
 	SMTPPort                    string
 	SMTPUsername                string
@@ -29,8 +28,12 @@ type config struct {
 }
 
 func loadConfig() (config, error) {
-	if err := LoadDotEnv(); err != nil {
-		log.Printf("no .env file loaded: %v", err)
+	envFile := os.Getenv("CHURA_ENV_FILE")
+	if envFile == "" {
+		envFile = ".env"
+	}
+	if err := LoadDotEnv(envFile); err != nil {
+		log.Printf("no environment file %q loaded: %v", envFile, err)
 	}
 
 	cfg := config{
@@ -45,7 +48,6 @@ func loadConfig() (config, error) {
 		KeycloakBackendClientSecret: os.Getenv("KC_BACKEND_CLIENT_SECRET"),
 		MongoURI:                    os.Getenv("MONGODB_URI"),
 		MongoDatabase:               os.Getenv("MONGODB_DATABASE"),
-		TestEmail:                   os.Getenv("TEST_EMAIL_TO"),
 		SMTPHost:                    os.Getenv("SMTP_HOST"),
 		SMTPPort:                    os.Getenv("SMTP_PORT"),
 		SMTPUsername:                os.Getenv("SMTP_USERNAME"),

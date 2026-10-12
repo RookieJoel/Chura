@@ -5,8 +5,13 @@ import (
 	"strings"
 )
 
-func LoadDotEnv() error {
-	content, err := os.ReadFile(".env")
+func LoadDotEnv(paths ...string) error {
+	path := ".env"
+	if len(paths) > 0 && paths[0] != "" {
+		path = paths[0]
+	}
+
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}

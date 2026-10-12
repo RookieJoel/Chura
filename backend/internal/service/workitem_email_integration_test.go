@@ -15,8 +15,12 @@ func TestWorkItemServiceCheckSprintFinishedSendsRealEmail(t *testing.T) {
 	if os.Getenv("CHURA_EMAIL_INTEGRATION") != "1" {
 		t.Skip("set CHURA_EMAIL_INTEGRATION=1 to send a real email")
 	}
-	if err := godotenv.Load("../../.env"); err != nil {
-		t.Logf("load .env: %v; using process environment", err)
+	envFile := os.Getenv("CHURA_TEST_ENV_FILE")
+	if envFile == "" {
+		envFile = "../../.env.test"
+	}
+	if err := godotenv.Load(envFile); err != nil {
+		t.Logf("load %s: %v; using process environment", envFile, err)
 	}
 
 	required := []string{

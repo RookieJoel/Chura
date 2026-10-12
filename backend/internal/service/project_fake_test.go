@@ -103,6 +103,19 @@ func (d *fakeDirectory) DeleteProjectGroup(_ context.Context, groupID string) er
 	return d.errs["DeleteProjectGroup"]
 }
 
+func (d *fakeDirectory) FindUserByID(_ context.Context, userID string) (domain.DirectoryUser, error) {
+	d.log.record("FindUserByID(%s)", userID)
+	if err := d.errs["FindUserByID"]; err != nil {
+		return domain.DirectoryUser{}, err
+	}
+	for _, user := range d.users {
+		if user.ID == userID {
+			return user, nil
+		}
+	}
+	return domain.DirectoryUser{}, fmt.Errorf("user %s: %w", userID, domain.ErrNotFound)
+}
+
 func (d *fakeDirectory) FindUserByEmail(_ context.Context, email string) (domain.DirectoryUser, error) {
 	d.log.record("FindUserByEmail(%s)", email)
 	if err := d.errs["FindUserByEmail"]; err != nil {

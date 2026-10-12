@@ -20,10 +20,23 @@ talks to Keycloak both to validate tokens and through the Admin API.
 | `KC_BACKEND_CLIENT_ID` | Confidential service-account client, `chura-backend` |
 | `KC_BACKEND_CLIENT_SECRET` | Its secret (local dev value: `chura-backend-dev-secret`) |
 | `GRPC_PORT` | Optional, default `9000`; change it if another local service holds 9000 |
+| `SMTP_HOST` | SMTP server used for work-item notification emails |
+| `SMTP_PORT` | SMTP server port, usually `587` |
+| `SMTP_USERNAME` | SMTP account username |
+| `SMTP_PASSWORD` | SMTP account password |
+| `SMTP_FROM` | Sender address for notification emails |
 
 `backend/.env.example` contains working local development values. Copy it to
 `backend/.env` and adjust. The four `KC_*` variables above are required; the
 backend refuses to start without them.
+
+The API loads `backend/.env` by default. Set `CHURA_ENV_FILE` to load a
+different environment file, for example `CHURA_ENV_FILE=.env.dev`.
+
+SMTP settings are used by the production RabbitMQ notification consumer to
+send emails to reporters and assignees. They are not legacy test-only
+settings. The opt-in email integration test uses the same variable names from
+the separate `backend/.env.test` file.
 
 > **Dev only:** `keycloak/realm-config.json` seeds the `chura-backend` client
 > secret and test-user passwords for local import. For any shared or
@@ -74,3 +87,15 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
   -d '{"email":"pim@example.com"}' \
   http://localhost:<PORT>/api/v1/projects/<projectId>/members
 ```
+
+### Email integration test
+
+The real-email integration test is opt-in and reads `backend/.env.test` rather
+than the application environment file. Copy `backend/.env.test.example` to
+`backend/.env.test`, fill in the local SMTP values and recipient, then run:
+
+```bash
+CHURA_EMAIL_INTEGRATION=1 go test ./internal/service -run TestWorkItemServiceCheckSprintFinishedSendsRealEmail
+```
+
+Set `CHURA_TEST_ENV_FILE` when the test environment file is stored elsewhere.
