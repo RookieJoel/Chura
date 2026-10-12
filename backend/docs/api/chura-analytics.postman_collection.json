@@ -1,0 +1,216 @@
+{
+  "info": {
+    "name": "Chura - Analytics & Reporting",
+    "description": "Run in order: 0 Auth -> 1 Setup -> 2 Analytics. Tokens, projectId and sprintId are saved to collection variables automatically. Work items must be put in the sprint by hand (see 1 Setup / README) until assignWorkItemToSprint exists.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8083/api/v1" },
+    { "key": "keycloakUrl", "value": "http://localhost:8080" },
+    { "key": "username", "value": "tonnam" },
+    { "key": "password", "value": "test1234" },
+    { "key": "token", "value": "" },
+    { "key": "auditorToken", "value": "" },
+    { "key": "projectId", "value": "" },
+    { "key": "sprintId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0 Auth",
+      "item": [
+        {
+          "name": "Get token (team member)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('token', pm.response.json().access_token);"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "urlencoded", "urlencoded": [
+              { "key": "client_id", "value": "chura-auth-client" },
+              { "key": "grant_type", "value": "password" },
+              { "key": "username", "value": "{{username}}" },
+              { "key": "password", "value": "{{password}}" }
+            ] },
+            "url": "{{keycloakUrl}}/realms/chura/protocol/openid-connect/token"
+          }
+        },
+        {
+          "name": "Get token (auditor jojo)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('auditorToken', pm.response.json().access_token);"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "urlencoded", "urlencoded": [
+              { "key": "client_id", "value": "chura-auth-client" },
+              { "key": "grant_type", "value": "password" },
+              { "key": "username", "value": "jojo" },
+              { "key": "password", "value": "test1234" }
+            ] },
+            "url": "{{keycloakUrl}}/realms/chura/protocol/openid-connect/token"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 Setup",
+      "item": [
+        {
+          "name": "Get SE template (reflection topics + metrics)",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/templates/se" }
+        },
+        {
+          "name": "Create project (SE)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('projectId', pm.response.json().id);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Analytics demo\",\n  \"description\": \"Postman test\",\n  \"template_id\": \"se\"\n}" },
+            "url": "{{baseUrl}}/projects"
+          }
+        },
+        {
+          "name": "Create sprint",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('sprintId', pm.response.json().id);",
+            "console.log('Put work items in this sprint with: docker exec chura-agile-execution-mongodb mongosh chura --eval ...  (see README)');"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"name\": \"Sprint 1\",\n  \"team\": \"Alpha\",\n  \"start_date\": \"2026-10-05\",\n  \"end_date\": \"2026-10-16\",\n  \"status\": \"active\"\n}" },
+            "url": "{{baseUrl}}/sprints"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 Analytics",
+      "item": [
+        {
+          "name": "calculateSprintWorkSummary",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/sprints/{{sprintId}}/work-summary" }
+        },
+        {
+          "name": "retrieveSprintMetrics",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/sprints/{{sprintId}}/metrics" }
+        },
+        {
+          "name": "createSprintReflection",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"answers\": {\n    \"went_well\": \"Daily stand-ups kept us aligned\",\n    \"stop\": \"Merging everything on the last day\",\n    \"start\": \"Writing tests first\"\n  }\n}" },
+            "url": "{{baseUrl}}/sprints/{{sprintId}}/reflections/me"
+          }
+        },
+        {
+          "name": "retrieveSprintReflection",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/sprints/{{sprintId}}/reflections" }
+        },
+        {
+          "name": "generateSprintReviewSummary (template defaults)",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/sprints/{{sprintId}}/review-summary" }
+        },
+        {
+          "name": "generateSprintReviewSummary (chosen metrics)",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/sprints/{{sprintId}}/review-summary?metrics=planned_items,completed_points,points_completion_rate" }
+        },
+        {
+          "name": "exportSummaryReport (csv)",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/sprints/{{sprintId}}/review-summary/export?format=csv" }
+        },
+        {
+          "name": "exportSummaryReport (markdown)",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/sprints/{{sprintId}}/review-summary/export?format=markdown" }
+        }
+      ]
+    },
+    {
+      "name": "3 Error cases",
+      "item": [
+        {
+          "name": "Reflection missing topics -> 400",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 with violations', () => { pm.response.to.have.status(400); pm.expect(pm.response.json().violations).to.have.length(2); });"
+          ] } }],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"answers\": { \"went_well\": \"only this\" }\n}" },
+            "url": "{{baseUrl}}/sprints/{{sprintId}}/reflections/me"
+          }
+        },
+        {
+          "name": "Auditor submits reflection -> 403",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auditorToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"answers\": { \"went_well\": \"a\", \"stop\": \"b\", \"start\": \"c\" }\n}" },
+            "url": "{{baseUrl}}/sprints/{{sprintId}}/reflections/me"
+          }
+        },
+        {
+          "name": "Auditor reads review summary -> 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auditorToken}}", "type": "string" }] },
+            "method": "GET", "header": [],
+            "url": "{{baseUrl}}/sprints/{{sprintId}}/review-summary"
+          }
+        },
+        {
+          "name": "Unknown metric -> 400",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/sprints/{{sprintId}}/review-summary?metrics=velocity_magic" }
+        },
+        {
+          "name": "Unknown export format -> 400",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/sprints/{{sprintId}}/review-summary/export?format=pdf" }
+        },
+        {
+          "name": "Unknown sprint -> 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('404', () => pm.response.to.have.status(404));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/sprints/999999/metrics" }
+        },
+        {
+          "name": "No token -> 401",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "header": [], "url": "{{baseUrl}}/sprints/{{sprintId}}/metrics" }
+        }
+      ]
+    }
+  ]
+}

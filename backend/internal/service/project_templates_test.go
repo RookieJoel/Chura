@@ -31,6 +31,8 @@ func TestGetAvailableTemplates_ExposesGeneralAndSE(t *testing.T) {
 				RequiredFields: []string{"title"},
 				TypeRules:      []domain.WorkItemTypeRule{},
 			},
+			Reflection:   domain.StandardReflectionTemplate(),
+			SprintReview: domain.GeneralSprintReviewTemplate(),
 		},
 		{
 			ID: "se", Name: "Software Engineering", Mode: "se",
@@ -45,6 +47,8 @@ func TestGetAvailableTemplates_ExposesGeneralAndSE(t *testing.T) {
 					Type: "user_story", DescriptionFormat: domain.DescriptionFormatUserStory, RequireAcceptanceCriteria: true,
 				}},
 			},
+			Reflection:   domain.StandardReflectionTemplate(),
+			SprintReview: domain.SESprintReviewTemplate(),
 		},
 	}
 	if !reflect.DeepEqual(got, want) {

@@ -258,6 +258,136 @@ paths:
         "403": { $ref: "#/components/responses/NotProjectMember" }
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/sprints/{sprintId}/work-summary:
+    parameters:
+      - $ref: "#/components/parameters/SprintId"
+    get:
+      tags: [Analytics & Reporting]
+      summary: >-
+        Calculate the Sprint Work Summary (calculateSprintWorkSummary). Work
+        items in the Sprint are planned; done ones are completed, blocked ones
+        blocked and every other one carry-over. Members of the Project and
+        Auditors only.
+      operationId: calculateSprintWorkSummary
+      responses:
+        "200":
+          description: Work summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SprintWorkSummary" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/sprints/{sprintId}/metrics:
+    parameters:
+      - $ref: "#/components/parameters/SprintId"
+    get:
+      tags: [Analytics & Reporting]
+      summary: Retrieve Sprint metrics, work items and progress (retrieveSprintMetrics). Members of the Project and Auditors only.
+      operationId: retrieveSprintMetrics
+      responses:
+        "200":
+          description: Sprint metrics
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SprintMetrics" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/sprints/{sprintId}/reflections:
+    parameters:
+      - $ref: "#/components/parameters/SprintId"
+    get:
+      tags: [Analytics & Reporting]
+      summary: List the Sprint's reflections, oldest first (retrieveSprintReflection). Members of the Project and Auditors only.
+      operationId: retrieveSprintReflection
+      responses:
+        "200":
+          description: Reflections
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SprintReflection" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/sprints/{sprintId}/reflections/me:
+    parameters:
+      - $ref: "#/components/parameters/SprintId"
+    put:
+      tags: [Analytics & Reporting]
+      summary: >-
+        Submit the caller's reflection for the Sprint (createSprintReflection).
+        Answers are validated against the topics in the Project Template's
+        `reflection` (went_well, stop, start); submitting again replaces the
+        earlier answers. Team Members who belong to the Project only.
+      operationId: createSprintReflection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReflectionRequest" }
+      responses:
+        "200":
+          description: The stored reflection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SprintReflection" }
+        "400": { $ref: "#/components/responses/InvalidInput" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/sprints/{sprintId}/review-summary:
+    parameters:
+      - $ref: "#/components/parameters/SprintId"
+      - $ref: "#/components/parameters/Metrics"
+    get:
+      tags: [Analytics & Reporting]
+      summary: >-
+        Generate the standardized Sprint Review Summary
+        (generateSprintReviewSummary): selected quantitative metrics plus the
+        team's reflections grouped by topic. Members of the Project and
+        Auditors only.
+      operationId: generateSprintReviewSummary
+      responses:
+        "200":
+          description: Sprint Review Summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SprintReviewSummary" }
+        "400": { $ref: "#/components/responses/InvalidInput" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/sprints/{sprintId}/review-summary/export:
+    parameters:
+      - $ref: "#/components/parameters/SprintId"
+      - $ref: "#/components/parameters/Metrics"
+      - name: format
+        in: query
+        required: false
+        schema: { type: string, enum: [csv, markdown, md], default: csv }
+    get:
+      tags: [Analytics & Reporting]
+      summary: Download the Sprint Review Summary as a file (exportSummaryReport). Members of the Project and Auditors only.
+      operationId: exportSummaryReport
+      responses:
+        "200":
+          description: File download (`Content-Disposition` attachment named sprint-{id}-review.csv or .md)
+          content:
+            text/csv: { schema: { type: string } }
+            text/markdown: { schema: { type: string } }
+        "400": { $ref: "#/components/responses/InvalidInput" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotProjectMember" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /api/v1/whoami:
     get:
       summary: Identity of the authenticated caller
@@ -291,6 +421,20 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    SprintId:
+      name: sprintId
+      in: path
+      required: true
+      schema: { type: string, example: "7" }
+    Metrics:
+      name: metrics
+      in: query
+      required: false
+      description: >-
+        Comma-separated metric keys to include, e.g.
+        `planned_items,completion_rate`. Must be offered by the Project
+        Template's `sprint_review.metrics`; omitted means its `default_metrics`.
+      schema: { type: string }
   responses:
     InvalidInput:
       description: >-
@@ -361,7 +505,7 @@ components:
         message: { type: string }
     Template:
       type: object
-      required: [id, name, mode, work_item_types, roles, default_role, creator_role, capabilities, validation_rules]
+      required: [id, name, mode, work_item_types, roles, default_role, creator_role, capabilities, validation_rules, reflection, sprint_review]
       properties:
         id: { type: string, example: se }
         name: { type: string }
@@ -374,6 +518,44 @@ components:
         creator_role: { type: string }
         capabilities: { type: array, items: { type: string } }
         validation_rules: { $ref: "#/components/schemas/ValidationRules" }
+        reflection: { $ref: "#/components/schemas/ReflectionTemplate" }
+        sprint_review: { $ref: "#/components/schemas/SprintReviewTemplate" }
+    ReflectionTemplate:
+      type: object
+      description: Topics a Sprint Reflection answers, in display order.
+      properties:
+        topics:
+          type: array
+          items:
+            type: object
+            properties:
+              key: { type: string, enum: [went_well, stop, start] }
+              question: { type: string, example: "What went well?" }
+              hint: { type: string }
+              required: { type: boolean }
+              max_runes: { type: integer, example: 2000 }
+    SprintReviewTemplate:
+      type: object
+      description: Metrics a Sprint Review Summary may show (in report order) and the defaults.
+      properties:
+        title: { type: string }
+        metrics:
+          type: array
+          items: { $ref: "#/components/schemas/MetricDefinition" }
+        default_metrics:
+          type: array
+          items: { $ref: "#/components/schemas/MetricKey" }
+    MetricKey:
+      type: string
+      description: The *_points metrics are offered by the SE template only.
+      enum: [planned_items, completed_items, carry_over_items, blocked_items, completion_rate,
+             planned_points, completed_points, carry_over_points, blocked_points, points_completion_rate]
+    MetricDefinition:
+      type: object
+      properties:
+        key: { $ref: "#/components/schemas/MetricKey" }
+        label: { type: string }
+        unit: { type: string, enum: [items, points, percent] }
     ValidationRules:
       type: object
       description: Rules that drive validateWorkItemAttributes for Projects using the Template.
@@ -498,3 +680,114 @@ components:
         status: { type: string, enum: [planned, active, completed] }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+    WorkBucket:
+      type: object
+      properties:
+        items: { type: integer }
+        points: { type: integer }
+    SprintWorkSummary:
+      type: object
+      description: planned = completed + carry_over + blocked.
+      properties:
+        planned: { $ref: "#/components/schemas/WorkBucket" }
+        completed: { $ref: "#/components/schemas/WorkBucket" }
+        carry_over: { $ref: "#/components/schemas/WorkBucket" }
+        blocked: { $ref: "#/components/schemas/WorkBucket" }
+    SprintProgress:
+      type: [object, "null"]
+      description: Null when the Sprint has no start or end date. Days count inclusively.
+      properties:
+        total_days: { type: integer }
+        elapsed_days: { type: integer }
+        remaining_days: { type: integer }
+        time_elapsed_rate: { type: number }
+    SprintMetrics:
+      type: object
+      properties:
+        sprint: { $ref: "#/components/schemas/Sprint" }
+        work_summary: { $ref: "#/components/schemas/SprintWorkSummary" }
+        completion_rate: { type: number, description: Percentage of work items done, one decimal }
+        points_completion_rate: { type: number }
+        status_breakdown: { type: object, additionalProperties: { type: integer } }
+        type_breakdown: { type: object, additionalProperties: { type: integer } }
+        progress: { $ref: "#/components/schemas/SprintProgress" }
+        work_items:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              title: { type: string }
+              type: { type: string }
+              status: { type: string }
+              priority: { type: string }
+              assignee_id: { type: string }
+              story_points: { type: integer }
+              category: { type: string, enum: [completed, carry_over, blocked] }
+        calculated_at: { type: string, format: date-time }
+    ReflectionRequest:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: object
+          additionalProperties: { type: string, maxLength: 2000 }
+          example: { went_well: Daily stand-ups kept us aligned, stop: Merging on the last day, start: Writing tests first }
+    SprintReflection:
+      type: object
+      properties:
+        id: { type: string }
+        sprint_id: { type: string }
+        project_id: { type: string, format: uuid }
+        author_id: { type: string }
+        author_email: { type: string }
+        template_id: { type: string }
+        answers: { type: object, additionalProperties: { type: string } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    SprintReviewSummary:
+      type: object
+      properties:
+        title: { type: string }
+        project:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+        sprint: { $ref: "#/components/schemas/Sprint" }
+        template_id: { type: string }
+        quantitative:
+          type: object
+          properties:
+            metrics:
+              type: array
+              items:
+                allOf:
+                  - $ref: "#/components/schemas/MetricDefinition"
+                  - type: object
+                    properties:
+                      value: { type: number }
+            work_summary: { $ref: "#/components/schemas/SprintWorkSummary" }
+            progress: { $ref: "#/components/schemas/SprintProgress" }
+        qualitative:
+          type: object
+          properties:
+            topics:
+              type: array
+              items:
+                type: object
+                properties:
+                  key: { type: string }
+                  question: { type: string }
+                  responses:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        author_id: { type: string }
+                        author_email: { type: string }
+                        answer: { type: string }
+            respondents: { type: integer }
+            team_size: { type: integer }
+            response_rate: { type: number }
+        generated_at: { type: string, format: date-time }

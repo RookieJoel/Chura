@@ -13,6 +13,7 @@ func NewRouter(
 	authHandler *AuthHandler,
 	templateHandler *TemplateHandler,
 	projectHandler *ProjectHandler,
+	analyticsHandler *AnalyticsHandler,
 	frontendURL string,
 	authMiddleware fiber.Handler,
 ) *fiber.App {
@@ -62,6 +63,13 @@ func NewRouter(
 	api.Get("/sprints/:id", sprintHandler.Get)
 	api.Put("/sprints/:id", sprintHandler.Update)
 	api.Delete("/sprints/:id", sprintHandler.Delete)
+
+	api.Get("/sprints/:id/work-summary", analyticsHandler.WorkSummary)
+	api.Get("/sprints/:id/metrics", analyticsHandler.Metrics)
+	api.Get("/sprints/:id/reflections", analyticsHandler.ListReflections)
+	api.Put("/sprints/:id/reflections/me", analyticsHandler.SubmitReflection)
+	api.Get("/sprints/:id/review-summary", analyticsHandler.ReviewSummary)
+	api.Get("/sprints/:id/review-summary/export", analyticsHandler.ExportReviewSummary)
 
 	api.Get("/whoami", authHandler.WhoAmI)
 

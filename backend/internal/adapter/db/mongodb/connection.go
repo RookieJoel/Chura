@@ -14,6 +14,7 @@ type Connection struct {
 	Client              *mongo.Client
 	Database            *mongo.Database
 	WorkItemsrepository out.WorkItemRepository
+	SprintWorkItems     out.SprintWorkItemReader
 }
 
 func Connect(uri, databaseName string) (*Connection, error) {
@@ -42,6 +43,7 @@ func Connect(uri, databaseName string) (*Connection, error) {
 		Client:              client,
 		Database:            client.Database(databaseName),
 		WorkItemsrepository: workItemRepository,
+		SprintWorkItems:     workItemRepository,
 	}, nil
 }
 

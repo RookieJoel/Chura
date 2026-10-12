@@ -145,9 +145,11 @@ func (service *WorkItemService) UpdateWorkItem(item domain.WorkItem) (domain.Wor
 		return domain.WorkItem{}, err
 	}
 	item.CreatedAt = existing.CreatedAt
+
 	if strings.TrimSpace(item.SprintID) == "" {
 		item.SprintID = existing.SprintID
 	}
+
 	item.UpdatedAt = time.Now().UTC()
 	updated, err := service.repository.Update(item)
 	if err != nil {
