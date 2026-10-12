@@ -28,8 +28,10 @@ const (
 )
 
 type WorkItem struct {
-	ID          string
-	ProjectID   string
+	ID        string
+	ProjectID string
+	// SprintID is the Sprint the item is committed to; empty while in the Backlog.
+	SprintID    string
 	Title       string
 	Description string
 	Type        WorkItemType

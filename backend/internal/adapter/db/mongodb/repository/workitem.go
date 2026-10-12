@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
@@ -12,7 +13,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var _ out.WorkItemRepository = (*WorkItemRepository)(nil)
+var (
+	_ out.WorkItemRepository   = (*WorkItemRepository)(nil)
+	_ out.SprintWorkItemReader = (*WorkItemRepository)(nil)
+)
 
 type WorkItemRepository struct {
 	collection *mongo.Collection
@@ -23,9 +27,12 @@ func NewWorkItemRepository(database *mongo.Database) *WorkItemRepository {
 }
 
 func (repository *WorkItemRepository) EnsureIndexes() error {
-	_, err := repository.collection.Indexes().CreateOne(
+	_, err := repository.collection.Indexes().CreateMany(
 		context.Background(),
-		mongo.IndexModel{Keys: bson.D{{Key: "project_id", Value: 1}}},
+		[]mongo.IndexModel{
+			{Keys: bson.D{{Key: "project_id", Value: 1}}},
+			{Keys: bson.D{{Key: "project_id", Value: 1}, {Key: "sprint_id", Value: 1}}},
+		},
 	)
 	return err
 }
@@ -33,6 +40,7 @@ func (repository *WorkItemRepository) EnsureIndexes() error {
 type workItemDocument struct {
 	ID          string                  `bson:"_id"`
 	ProjectID   string                  `bson:"project_id"`
+	SprintID    string                  `bson:"sprint_id,omitempty"`
 	Title       string                  `bson:"title"`
 	Description string                  `bson:"description"`
 	Type        domain.WorkItemType     `bson:"type"`
@@ -66,18 +74,31 @@ func (repository *WorkItemRepository) Get(id string) (domain.WorkItem, error) {
 }
 
 func (repository *WorkItemRepository) List(projectID string) ([]domain.WorkItem, error) {
+	return repository.find(context.Background(), bson.M{"project_id": projectID})
+}
+
+// ListBySprint returns the work items of projectID committed to sprintID.
+func (repository *WorkItemRepository) ListBySprint(ctx context.Context, projectID, sprintID string) ([]domain.WorkItem, error) {
+	items, err := repository.find(ctx, bson.M{"project_id": projectID, "sprint_id": sprintID})
+	if err != nil {
+		return nil, fmt.Errorf("list work items of sprint %s: %w", sprintID, err)
+	}
+	return items, nil
+}
+
+func (repository *WorkItemRepository) find(ctx context.Context, filter bson.M) ([]domain.WorkItem, error) {
 	cursor, err := repository.collection.Find(
-		context.Background(),
-		bson.M{"project_id": projectID},
+		ctx,
+		filter,
 		options.Find().SetSort(bson.D{{Key: "created_at", Value: 1}, {Key: "_id", Value: 1}}),
 	)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = cursor.Close(context.Background()) }()
+	defer func() { _ = cursor.Close(ctx) }()
 
 	var documents []workItemDocument
-	if err := cursor.All(context.Background(), &documents); err != nil {
+	if err := cursor.All(ctx, &documents); err != nil {
 		return nil, err
 	}
 	items := make([]domain.WorkItem, 0, len(documents))
@@ -117,6 +138,7 @@ func documentFromDomain(item domain.WorkItem) workItemDocument {
 	return workItemDocument{
 		ID:          item.ID,
 		ProjectID:   item.ProjectID,
+		SprintID:    item.SprintID,
 		Title:       item.Title,
 		Description: item.Description,
 		Type:        item.Type,
@@ -135,6 +157,7 @@ func domainFromDocument(document workItemDocument) domain.WorkItem {
 	return domain.WorkItem{
 		ID:          document.ID,
 		ProjectID:   document.ProjectID,
+		SprintID:    document.SprintID,
 		Title:       document.Title,
 		Description: document.Description,
 		Type:        document.Type,

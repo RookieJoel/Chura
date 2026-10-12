@@ -29,5 +29,9 @@ func testActorMiddleware(c *fiber.Ctx) error {
 // newTestRouter builds the real router with the test-only actor middleware, so
 // tests exercise routing and handlers without real JWTs.
 func newTestRouter(sprints *handler.SprintHandler, templates *handler.TemplateHandler, projects *handler.ProjectHandler) *fiber.App {
-	return handler.NewRouter(sprints, handler.NewAuthHandler(), templates, projects, "http://localhost:3000", testActorMiddleware)
+	return newTestRouterWithAnalytics(sprints, templates, projects, handler.NewAnalyticsHandler(nil))
+}
+
+func newTestRouterWithAnalytics(sprints *handler.SprintHandler, templates *handler.TemplateHandler, projects *handler.ProjectHandler, analytics *handler.AnalyticsHandler) *fiber.App {
+	return handler.NewRouter(sprints, handler.NewAuthHandler(), templates, projects, analytics, "http://localhost:3000", testActorMiddleware)
 }

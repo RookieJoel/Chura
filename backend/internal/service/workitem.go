@@ -53,6 +53,8 @@ func (service *WorkItemService) UpdateWorkItem(item domain.WorkItem) (domain.Wor
 		return domain.WorkItem{}, err
 	}
 	item.CreatedAt = existing.CreatedAt
+	// Sprint membership changes only through Sprint assignment, never an edit.
+	item.SprintID = existing.SprintID
 	item.UpdatedAt = time.Now().UTC()
 	return service.repository.Update(item)
 }

@@ -7,11 +7,13 @@ import (
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/db"
 	memory "github.com/RookieJoel/Chura/backend/internal/adapter/db/postgres/repository"
+	"github.com/RookieJoel/Chura/backend/internal/adapter/exporter"
 	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc"
 	workitempb "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/identity/keycloak"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/middleware"
+	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/RookieJoel/Chura/backend/internal/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -65,6 +67,16 @@ func main() {
 	templateHandler := http.NewTemplateHandler(projectService)
 	projectHandler := http.NewProjectHandler(projectService)
 
+	analyticsService := service.NewAnalyticsReportingService(
+		sprintRepository,
+		projectService,
+		projectService,
+		connections.Mongo.SprintWorkItems,
+		memory.NewReflectionRepository(connections.Postgres),
+		[]out.ReportExporter{exporter.NewCSVExporter(), exporter.NewMarkdownExporter()},
+	)
+	analyticsHandler := http.NewAnalyticsHandler(analyticsService)
+
 	jwks, err := keyfunc.NewDefault([]string{cfg.KeycloakJWKSURL})
 	if err != nil {
 		log.Fatalf("Failed to initialize JWKS: %v", err)
@@ -77,6 +89,7 @@ func main() {
 		authHandler,
 		templateHandler,
 		projectHandler,
+		analyticsHandler,
 		cfg.FrontendURL,
 		authMiddleware,
 	)
