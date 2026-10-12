@@ -22,6 +22,7 @@ type ProjectRepository interface {
 type ProjectDirectory interface {
 	CreateProjectGroup(ctx context.Context, projectID string) (groupID string, err error)
 	DeleteProjectGroup(ctx context.Context, groupID string) error
+	FindUserByID(ctx context.Context, userID string) (domain.DirectoryUser, error)
 	FindUserByEmail(ctx context.Context, email string) (domain.DirectoryUser, error) // ErrNotFound
 	ListMembers(ctx context.Context, groupID, projectID string) ([]domain.Member, error)
 	AddMember(ctx context.Context, groupID, projectID, userID string, role domain.ProjectRole) error

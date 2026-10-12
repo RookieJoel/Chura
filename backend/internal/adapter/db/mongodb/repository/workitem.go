@@ -33,6 +33,7 @@ func (repository *WorkItemRepository) EnsureIndexes() error {
 type workItemDocument struct {
 	ID          string                  `bson:"_id"`
 	ProjectID   string                  `bson:"project_id"`
+	SprintID    string                  `bson:"sprint_id,omitempty"`
 	Title       string                  `bson:"title"`
 	Description string                  `bson:"description"`
 	Type        domain.WorkItemType     `bson:"type"`
@@ -65,10 +66,18 @@ func (repository *WorkItemRepository) Get(id string) (domain.WorkItem, error) {
 	return domainFromDocument(document), nil
 }
 
-func (repository *WorkItemRepository) List(projectID string) ([]domain.WorkItem, error) {
+func (repository *WorkItemRepository) List(filter out.WorkItemFilter) ([]domain.WorkItem, error) {
+	query := bson.M{}
+	if filter.ProjectID != "" {
+		query["project_id"] = filter.ProjectID
+	}
+	if filter.SprintID != "" {
+		query["sprint_id"] = filter.SprintID
+	}
+
 	cursor, err := repository.collection.Find(
 		context.Background(),
-		bson.M{"project_id": projectID},
+		query,
 		options.Find().SetSort(bson.D{{Key: "created_at", Value: 1}, {Key: "_id", Value: 1}}),
 	)
 	if err != nil {
@@ -117,6 +126,7 @@ func documentFromDomain(item domain.WorkItem) workItemDocument {
 	return workItemDocument{
 		ID:          item.ID,
 		ProjectID:   item.ProjectID,
+		SprintID:    item.SprintID,
 		Title:       item.Title,
 		Description: item.Description,
 		Type:        item.Type,
@@ -135,6 +145,7 @@ func domainFromDocument(document workItemDocument) domain.WorkItem {
 	return domain.WorkItem{
 		ID:          document.ID,
 		ProjectID:   document.ProjectID,
+		SprintID:    document.SprintID,
 		Title:       document.Title,
 		Description: document.Description,
 		Type:        document.Type,

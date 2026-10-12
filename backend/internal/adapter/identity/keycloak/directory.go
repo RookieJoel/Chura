@@ -171,6 +171,26 @@ func (d *Directory) FindUserByEmail(ctx context.Context, email string) (domain.D
 	return found, err
 }
 
+func (d *Directory) FindUserByID(ctx context.Context, userID string) (domain.DirectoryUser, error) {
+	var found domain.DirectoryUser
+	err := d.call(ctx, "find user by ID", func(ctx context.Context, token string) error {
+		user, err := d.client.GetUserByID(ctx, token, d.realm, userID)
+		if err != nil {
+			return err
+		}
+		if user == nil || gocloak.PString(user.ID) == "" || gocloak.PString(user.Email) == "" {
+			return fmt.Errorf("user %q has no email: %w", userID, domain.ErrNotFound)
+		}
+		found = domain.DirectoryUser{
+			ID:    gocloak.PString(user.ID),
+			Email: gocloak.PString(user.Email),
+			Name:  displayName(user),
+		}
+		return nil
+	})
+	return found, err
+}
+
 // systemRole maps effective realm roles to a Chura system role; neither or both yield "".
 func systemRole(roles []*gocloak.Role) domain.SystemRole {
 	var isMember, isAuditor bool

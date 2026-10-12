@@ -72,6 +72,24 @@
       "emailVerified": true
     },
     {
+      "username": "viva",
+      "enabled": true,
+      "email": "6630357821@student.chula.ac.th",
+      "firstName": "Akkharachai",
+      "lastName": "Yongsuwankul",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "test1234",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "member"
+      ],
+      "emailVerified": true
+    },
+    {
       "username": "tonnam",
       "enabled": true,
       "email": "tonnam@example.com",
