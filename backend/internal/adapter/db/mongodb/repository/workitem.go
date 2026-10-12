@@ -66,38 +66,24 @@ func (repository *WorkItemRepository) Get(id string) (domain.WorkItem, error) {
 	return domainFromDocument(document), nil
 }
 
-func (repository *WorkItemRepository) List(projectID string) ([]domain.WorkItem, error) {
+func (repository *WorkItemRepository) List(filter out.WorkItemFilter) ([]domain.WorkItem, error) {
+	query := bson.M{}
+	if filter.ProjectID != "" {
+		query["project_id"] = filter.ProjectID
+	}
+	if filter.SprintID != "" {
+		query["sprint_id"] = filter.SprintID
+	}
+
 	cursor, err := repository.collection.Find(
 		context.Background(),
-		bson.M{"project_id": projectID},
+		query,
 		options.Find().SetSort(bson.D{{Key: "created_at", Value: 1}, {Key: "_id", Value: 1}}),
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = cursor.Close(context.Background()) }()
-
-	var documents []workItemDocument
-	if err := cursor.All(context.Background(), &documents); err != nil {
-		return nil, err
-	}
-	items := make([]domain.WorkItem, 0, len(documents))
-	for _, document := range documents {
-		items = append(items, domainFromDocument(document))
-	}
-	return items, nil
-}
-
-func (repository *WorkItemRepository) ListBySprint(sprintID string) ([]domain.WorkItem, error) {
-	cursor, err := repository.collection.Find(
-		context.Background(),
-		bson.M{"sprint_id": sprintID},
-		options.Find().SetSort(bson.D{{Key: "created_at", Value: 1}, {Key: "_id", Value: 1}}),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(context.Background())
 
 	var documents []workItemDocument
 	if err := cursor.All(context.Background(), &documents); err != nil {

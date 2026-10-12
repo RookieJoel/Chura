@@ -92,7 +92,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 
 The real-email integration test is opt-in and reads `backend/.env.test` rather
 than the application environment file. Copy `backend/.env.test.example` to
-`backend/.env.test`, fill in the local SMTP values and recipient, then run:
+`backend/.env.test` and fill in the local SMTP values, then run:
 
 ```bash
 CHURA_EMAIL_INTEGRATION=1 go test ./internal/service -run TestWorkItemServiceCheckSprintFinishedSendsRealEmail

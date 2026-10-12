@@ -1,15 +1,32 @@
 package service_test
 
 import (
+	"errors"
 	"os"
 	"testing"
 
 	emailadapter "github.com/RookieJoel/Chura/backend/internal/adapter/email"
 	memory "github.com/RookieJoel/Chura/backend/internal/adapter/postgres/repository"
 	"github.com/RookieJoel/Chura/backend/internal/domain"
+	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/RookieJoel/Chura/backend/internal/service"
 	"github.com/joho/godotenv"
 )
+
+type integrationRecipientRepository struct {
+	email string
+}
+
+const integrationTestRecipient = "test@gmail.com"
+
+var _ out.NotificationRecipientRepository = (*integrationRecipientRepository)(nil)
+
+func (repository integrationRecipientRepository) GetEmailByUserID(userID string) (string, error) {
+	if userID == "" {
+		return "", errors.New("user_id is required")
+	}
+	return repository.email, nil
+}
 
 func TestWorkItemServiceCheckSprintFinishedSendsRealEmail(t *testing.T) {
 	if os.Getenv("CHURA_EMAIL_INTEGRATION") != "1" {
@@ -29,7 +46,6 @@ func TestWorkItemServiceCheckSprintFinishedSendsRealEmail(t *testing.T) {
 		"SMTP_USERNAME",
 		"SMTP_PASSWORD",
 		"SMTP_FROM",
-		"TEST_EMAIL_TO",
 	}
 	for _, name := range required {
 		if os.Getenv(name) == "" {
@@ -38,9 +54,7 @@ func TestWorkItemServiceCheckSprintFinishedSendsRealEmail(t *testing.T) {
 	}
 
 	notificationService := service.NewNotificationService(
-		memory.NotificationRecipientRepository{
-			TestEmail: os.Getenv("TEST_EMAIL_TO"),
-		},
+		integrationRecipientRepository{email: integrationTestRecipient},
 		emailadapter.SMTPSender{
 			Host:     os.Getenv("SMTP_HOST"),
 			Port:     os.Getenv("SMTP_PORT"),

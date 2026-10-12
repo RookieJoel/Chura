@@ -76,14 +76,14 @@ func (service *WorkItemService) ListWorkItems(projectID string) ([]domain.WorkIt
 	if strings.TrimSpace(projectID) == "" {
 		return nil, errors.New("project_id is required")
 	}
-	return service.repository.List(projectID)
+	return service.repository.List(out.WorkItemFilter{ProjectID: projectID})
 }
 
 func (service *WorkItemService) ListWorkItemsBySprint(sprintID string) ([]domain.WorkItem, error) {
 	if strings.TrimSpace(sprintID) == "" {
 		return nil, errors.New("sprint_id is required")
 	}
-	return service.repository.ListBySprint(sprintID)
+	return service.repository.List(out.WorkItemFilter{SprintID: sprintID})
 }
 
 func (service *WorkItemService) CheckSprintFinished(sprintID string) (bool, error) {

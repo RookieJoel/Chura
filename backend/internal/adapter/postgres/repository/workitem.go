@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
+	"github.com/RookieJoel/Chura/backend/internal/port/out"
 )
 
 type WorkItemRepository struct {
@@ -32,28 +33,21 @@ func (repository *WorkItemRepository) Get(id string) (domain.WorkItem, error) {
 	return item, nil
 }
 
-func (repository *WorkItemRepository) List(projectID string) ([]domain.WorkItem, error) {
+func (repository *WorkItemRepository) List(filter out.WorkItemFilter) ([]domain.WorkItem, error) {
 	repository.mu.RLock()
 	defer repository.mu.RUnlock()
 	items := make([]domain.WorkItem, 0)
 	for _, item := range repository.items {
-		if item.ProjectID == projectID {
+		if matchesFilter(item, filter) {
 			items = append(items, item)
 		}
 	}
 	return items, nil
 }
 
-func (repository *WorkItemRepository) ListBySprint(sprintID string) ([]domain.WorkItem, error) {
-	repository.mu.RLock()
-	defer repository.mu.RUnlock()
-	items := make([]domain.WorkItem, 0)
-	for _, item := range repository.items {
-		if item.SprintID == sprintID {
-			items = append(items, item)
-		}
-	}
-	return items, nil
+func matchesFilter(item domain.WorkItem, filter out.WorkItemFilter) bool {
+	return (filter.ProjectID == "" || item.ProjectID == filter.ProjectID) &&
+		(filter.SprintID == "" || item.SprintID == filter.SprintID)
 }
 
 func (repository *WorkItemRepository) Update(item domain.WorkItem) (domain.WorkItem, error) {
