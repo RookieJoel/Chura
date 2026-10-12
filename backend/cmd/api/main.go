@@ -111,13 +111,14 @@ func main() {
 	}
 	defer rabbitPublisher.Close()
 
+	notificationHandler := service.NewNotificationEventHandler(notificationService)
 	notificationConsumer, err := rabbitmq.NewNotificationConsumer(rabbitConnection, cfg.RabbitMQNotificationQueue)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer notificationConsumer.Close()
 	go func() {
-		if err := notificationConsumer.Consume(notificationService); err != nil {
+		if err := notificationConsumer.Consume(notificationHandler); err != nil {
 			log.Printf("notification consumer stopped: %v", err)
 		}
 	}()
