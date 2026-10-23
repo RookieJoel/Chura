@@ -25,6 +25,7 @@ type config struct {
 	SMTPFrom                    string
 	RabbitMQURL                 string
 	RabbitMQNotificationQueue   string
+	InstanceName                string
 }
 
 func loadConfig() (config, error) {
@@ -55,6 +56,7 @@ func loadConfig() (config, error) {
 		SMTPFrom:                    os.Getenv("SMTP_FROM"),
 		RabbitMQURL:                 os.Getenv("RABBITMQ_URL"),
 		RabbitMQNotificationQueue:   os.Getenv("RABBITMQ_NOTIFICATION_QUEUE"),
+		InstanceName:                os.Getenv("INSTANCE_NAME"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -93,6 +95,10 @@ func loadConfig() (config, error) {
 	}
 	if cfg.RabbitMQNotificationQueue == "" {
 		cfg.RabbitMQNotificationQueue = "chura-notifications"
+	}
+	if cfg.InstanceName == "" {
+		// In Docker the hostname is the container ID, still unique per replica.
+		cfg.InstanceName, _ = os.Hostname()
 	}
 
 	return cfg, nil

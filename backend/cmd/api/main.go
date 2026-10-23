@@ -96,6 +96,7 @@ func main() {
 		projectHandler,
 		analyticsHandler,
 		cfg.FrontendURL,
+		cfg.InstanceName,
 		authMiddleware,
 	)
 
