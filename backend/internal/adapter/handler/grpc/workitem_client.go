@@ -80,6 +80,7 @@ func workItemInputFromDomain(item domain.WorkItem) *workitem.WorkItemInput {
 	}
 	return &workitem.WorkItemInput{
 		ProjectId:   item.ProjectID,
+		SprintId:    item.SprintID,
 		Title:       item.Title,
 		Description: item.Description,
 		Type:        typeValue(item.Type),
@@ -100,6 +101,7 @@ func workItemFromProto(item *workitem.WorkItem) domain.WorkItem {
 	return domain.WorkItem{
 		ID:          item.GetId(),
 		ProjectID:   item.GetProjectId(),
+		SprintID:    item.GetSprintId(),
 		Title:       item.GetTitle(),
 		Description: item.GetDescription(),
 		Type:        domain.WorkItemType(typeName(item.GetType())),

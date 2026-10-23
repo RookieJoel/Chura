@@ -21,7 +21,7 @@ API_PORT := 8083
 DEV_PORTS := 8080 27017 3000
 
 .PHONY: help setup check-tools check-ports env env-sync infra migrate frontend-deps verify-keycloak \
-        dev backend frontend up down status logs reset-keycloak clean test lint
+        dev backend frontend up down status logs reset-keycloak clean test lint loadtest loadtest-smoke
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -133,6 +133,12 @@ logs: ## Follow container logs (Ctrl-C to stop)
 test: ## Run backend (race) and frontend tests
 	$(MAKE) -C backend test
 	pnpm --dir frontend test
+
+loadtest: ## k6 ramping load test of the sprint/work item flow (needs `make dev`)
+	k6 run loadtest/sprint-workitem.js
+
+loadtest-smoke: ## k6 single-iteration check that the load test flow works
+	k6 run --vus 1 --iterations 1 loadtest/sprint-workitem.js
 
 lint: ## Run backend vet + frontend lint/typecheck
 	$(MAKE) -C backend lint
