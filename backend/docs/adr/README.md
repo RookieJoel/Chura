@@ -33,3 +33,4 @@ Same table format as `proposal.md`'s ADRs:
 - [0004](0004-workitem-api-architecture.md) — WorkItem API structure
 - [0005](0005-hexagonal-architecture.md) — Backend architecture pattern
 - [0006](0006-identity-provider-keycloak.md) — Identity provider (amended 2026-10-09: Project membership and Project Role live in Keycloak)
+- [0007](0007-load-testing-k6.md) — Load testing tool (k6)
