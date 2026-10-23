@@ -56,6 +56,42 @@ Destructive targets ask you to type `yes` first:
 | `make reset-keycloak` | All local Keycloak data (users, groups, Project memberships), then re-imports the realm |
 | `make clean` | All local containers and volumes — Keycloak, Postgres, MongoDB |
 
+## Load balancing with Kong (`make up`)
+
+`make up` runs 3 API replicas (`api-1`..`api-3`) behind the Kong API gateway.
+Kong listens on :8083 (the API's usual port, so the frontend works unchanged)
+and spreads requests round-robin across the replicas, dropping any that fail
+`/health`. `make dev` is unchanged: one API, no Kong.
+
+| What | Where |
+|---|---|
+| API through Kong | http://localhost:8083 |
+| Kong Admin API | http://localhost:8001 |
+| Konga dashboard (read-only) | http://localhost:1338 — `admin` / `admin1234` |
+
+On Windows, run `make` from Git Bash (`winget install ezwinports.make` if it is missing).
+
+**Config** lives in `deploy/kong/kong.yml` (Kong runs DB-less). Edit that file, then
+`docker compose -f deploy/docker-compose.yml restart kong`. Konga only displays it;
+creating or editing entities in Konga fails by design.
+
+**See it work.** Every API response carries `X-Instance: api-N`, the replica that served it.
+`/health` also puts it in the body, so refreshing http://localhost:8083/health in a
+browser shows `"instance"` changing.
+
+1. Konga → **Upstreams → chura-api-upstream → Targets**: the 3 replicas and their health.
+2. Requests rotate across replicas (also visible in the browser's Network tab):
+   ```bash
+   for i in $(seq 1 6); do curl -si localhost:8083/health | grep -i x-instance; done
+   ```
+   Konga's **Dashboard** request counter goes up as you send them.
+3. Failover: `docker stop chura-agile-execution-api-2`. Within ~10 s Kong marks it
+   unhealthy (Konga, or `curl -s localhost:8001/upstreams/chura-api-upstream/health`)
+   and only `api-1` / `api-3` answer. `docker start chura-agile-execution-api-2` brings it back.
+4. Weights: set e.g. `200 / 100 / 100` in `kong.yml` and restart Kong; `api-1` then gets half the traffic.
+
+In this mode the API's gRPC port (9000) is internal to each container; it is not published.
+
 ## Common issues
 
 ### A port is already in use

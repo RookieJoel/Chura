@@ -15,12 +15,20 @@ func NewRouter(
 	projectHandler *ProjectHandler,
 	analyticsHandler *AnalyticsHandler,
 	frontendURL string,
+	instanceName string,
 	authMiddleware fiber.Handler,
 ) *fiber.App {
 
 	app := fiber.New(fiber.Config{BodyLimit: maxRequestBodyBytes})
 
 	app.Use(recover.New())
+
+	// X-Instance names the replica that served the request, so load balancing
+	// behind Kong is visible from curl or the browser's Network tab.
+	app.Use(func(c *fiber.Ctx) error {
+		c.Set("X-Instance", instanceName)
+		return c.Next()
+	})
 
 	app.Use(func(c *fiber.Ctx) error {
 		c.Set("Access-Control-Allow-Origin", frontendURL)
@@ -43,7 +51,8 @@ func NewRouter(
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
-			"status": "healthy",
+			"status":   "healthy",
+			"instance": instanceName,
 		})
 	})
 
