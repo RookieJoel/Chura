@@ -36,8 +36,8 @@ WorkItem WebSocket endpoint.
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
-The backend API is available at
-[http://localhost:8083](http://localhost:8083), and the WorkItem WebSocket is
+The Kong API gateway is available at
+[http://localhost:8083](http://localhost:8083) (routes to project/sprint/analytics/workitem via Consul), and the WorkItem WebSocket is
 available at `ws://localhost:8083/ws/work-items`.
 
 ### 3. Start the frontend

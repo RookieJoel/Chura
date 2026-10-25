@@ -21,7 +21,7 @@ API_PORT := 8083
 DEV_PORTS := 8080 27017 3000
 
 .PHONY: help setup check-tools check-ports env env-sync infra migrate frontend-deps verify-keycloak \
-        dev backend frontend up down status logs reset-keycloak clean test lint loadtest loadtest-smoke
+        dev backend backend-split frontend up down status logs reset-keycloak clean test lint loadtest loadtest-smoke
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -43,7 +43,7 @@ check-tools: ## Verify required tools are installed
 	[ $$missing -eq 0 ] && echo "✔ tools: docker, go, node, pnpm, openssl, curl"; exit $$missing
 
 check-ports: backend/.env ## Warn about dev ports held by something other than Chura's containers
-	@for p in $(DEV_PORTS) "$(PG_PORT)" "$$(sed -n 's/^PORT=//p' backend/.env)" "$$(sed -n 's/^GRPC_PORT=//p' backend/.env)"; do \
+	@for p in $(DEV_PORTS) "$(PG_PORT)" 8056 8057 8058 8059; do \
 	  nc -z 127.0.0.1 $$p 2>/dev/null || continue; \
 	  name=$$(docker ps --filter "publish=$$p" --format '{{.Names}}' | head -1); \
 	  [[ "$$name" == chura-* ]] && continue; \
@@ -64,6 +64,7 @@ frontend/.env.local:
 	  echo "KEYCLOAK_ISSUER=$(KC_URL)/realms/chura"; \
 	  echo "KEYCLOAK_CLIENT_ID=chura-auth-client"; \
 	  echo "KEYCLOAK_CLIENT_SECRET="; \
+	  echo "# CHURA_API_URL is the Kong gateway when using make up; same port for unified paths"; \
 	  echo "CHURA_API_URL=http://localhost:$(API_PORT)"; \
 	  echo "NEXT_PUBLIC_WORK_ITEM_RPC_URL=ws://localhost:$(API_PORT)/ws/work-items"; \
 	} > $@
@@ -104,14 +105,16 @@ verify-keycloak: ## Check the local realm has the current config (backend client
 
 ## ---- day-to-day ------------------------------------------------------------
 
-dev: ## Run backend + frontend locally (Ctrl-C stops both)
+dev: ## Run backend-split + frontend locally (Ctrl-C stops both)
 	@trap 'kill 0' EXIT INT TERM; \
-	(cd backend && go run ./cmd/api) & \
+	$(MAKE) backend-split & \
 	pnpm --dir frontend dev & \
 	wait
 
-backend: ## Run only the backend locally (reads backend/.env)
-	cd backend && go run ./cmd/api
+backend-split: ## Run four domain services on :8056–:8059 (no Kong; reads backend/.env)
+	bash scripts/run-backend-split.sh
+
+backend: backend-split ## Alias for backend-split
 
 frontend: ## Run only the frontend (pnpm dev)
 	pnpm --dir frontend dev
@@ -134,7 +137,7 @@ test: ## Run backend (race) and frontend tests
 	$(MAKE) -C backend test
 	pnpm --dir frontend test
 
-loadtest: ## k6 ramping load test of the sprint/work item flow (needs `make dev`)
+loadtest: ## k6 ramping load test (needs Keycloak + `make up` — gateway on :8083)
 	k6 run loadtest/sprint-workitem.js
 
 loadtest-smoke: ## k6 single-iteration check that the load test flow works

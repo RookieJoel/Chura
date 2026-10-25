@@ -1,37 +1,67 @@
-# Kong declarative config (DB-less). Kong loads this on start; after editing,
-# run `docker compose -f deploy/docker-compose.yml restart kong`.
-# "2.1" is the format version for Kong 2.x (the kong image in docker-compose.yml).
+# Kong declarative config (DB-less). Upstreams use Consul DNS names; Kong's
+# resolver is Consul (:8600), set in deploy/kong/entrypoint.sh.
+# Scale a service in Compose; new nodes register the same Name and appear in DNS.
+# After editing: docker compose -f deploy/docker-compose.yml restart kong
+#
+# Regex paths must start with "/"; set regex_priority > 0 to treat them as regex.
 _format_version: "2.1"
 
-upstreams:
-  - name: chura-api-upstream
-    algorithm: round-robin
-    healthchecks:
-      # Kong probes /health on every target on its own
-      active:
-        type: http
-        http_path: /health
-        healthy:   { interval: 5, successes: 1 }
-        unhealthy: { interval: 5, http_failures: 2, tcp_failures: 2, timeouts: 2 }
-      # and also marks a target unhealthy when real traffic to it keeps failing
-      passive:
-        unhealthy: { http_failures: 3, tcp_failures: 3, timeouts: 3 }
-    # One target per API replica in docker-compose.yml. Equal weights split
-    # traffic evenly; e.g. 200/100/100 would send api-1 half of it.
-    targets:
-      - target: agile-execution-api-1:8083
-        weight: 100
-      - target: agile-execution-api-2:8083
-        weight: 100
-      - target: agile-execution-api-3:8083
-        weight: 100
-
 services:
-  - name: chura-api
-    host: chura-api-upstream # must match the upstream name above
-    port: 8083
+  - name: chura-analytics
+    host: chura-analytics.service.consul
+    port: 8056
     protocol: http
     routes:
-      - name: chura-api-route
-        paths: [/api, /health, /ws]
+      - name: chura-analytics-routes
+        regex_priority: 200
+        paths:
+          - /api/v1/sprints/[^/]+/work-summary$
+          - /api/v1/sprints/[^/]+/work-summary/export$
+          - /api/v1/sprints/[^/]+/metrics$
+          - /api/v1/sprints/[^/]+/reflections$
+          - /api/v1/sprints/[^/]+/reflections/me$
+          - /api/v1/sprints/[^/]+/review-summary$
+          - /api/v1/sprints/[^/]+/review-summary/export$
+        strip_path: false
+
+  - name: chura-sprint
+    host: chura-sprint.service.consul
+    port: 8057
+    protocol: http
+    routes:
+      - name: chura-sprint-item
+        regex_priority: 100
+        paths:
+          - /api/v1/sprints/[^/]+$
+        strip_path: false
+      - name: chura-sprint-collection
+        paths:
+          - /api/v1/sprints
+        strip_path: false
+
+  - name: chura-project
+    host: chura-project.service.consul
+    port: 8059
+    protocol: http
+    routes:
+      - name: chura-project-routes
+        paths:
+          - /api/v1/templates
+          - /api/v1/projects
+          - /api/v1/whoami
+        strip_path: false
+      - name: chura-health
+        paths:
+          - /health
+        strip_path: false
+
+  - name: chura-workitem
+    host: chura-workitem.service.consul
+    port: 8058
+    protocol: http
+    routes:
+      - name: chura-workitem-ws
+        paths:
+          - /ws/work-items
+          - /ws
         strip_path: false
