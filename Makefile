@@ -20,7 +20,7 @@ KC_URL := http://localhost:8080
 API_PORT := 8083
 DEV_PORTS := 8080 27017 3000
 
-.PHONY: help setup check-tools check-ports env env-sync infra migrate frontend-deps verify-keycloak \
+.PHONY: help setup check-tools check-ports env env-sync infra migrate seed-dev frontend-deps verify-keycloak \
         dev backend backend-split frontend up down status logs reset-keycloak clean test lint loadtest loadtest-smoke
 
 help: ## Show this help
@@ -28,7 +28,7 @@ help: ## Show this help
 
 ## ---- one-time setup -------------------------------------------------------
 
-setup: check-tools check-ports env infra migrate frontend-deps verify-keycloak ## One command dev setup (safe to re-run)
+setup: check-tools check-ports env infra migrate seed-dev frontend-deps verify-keycloak ## One command dev setup (safe to re-run)
 	@echo
 	@echo "✅ Setup done."
 	@echo "   make dev        → backend http://localhost:$(API_PORT) + frontend http://localhost:3000"
@@ -90,6 +90,9 @@ infra: backend/.env ## Start Keycloak, Postgres and MongoDB and wait until healt
 
 migrate: backend/.env ## Apply Postgres migrations (goose, in Docker)
 	$(DEPLOY) run --rm --build agile-execution-migrations
+
+seed-dev: backend/.env ## Seed local dev Postgres data (dev project row)
+	bash scripts/seed-dev-postgres.sh
 
 frontend-deps: ## Install frontend dependencies
 	pnpm --dir frontend install --frozen-lockfile

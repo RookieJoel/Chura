@@ -89,7 +89,14 @@ KEYCLOAK_CLIENT_ID=chura-auth-client
 KEYCLOAK_CLIENT_SECRET=
 CHURA_API_URL=http://localhost:8083
 NEXT_PUBLIC_WORK_ITEM_RPC_URL=ws://localhost:8083/ws/work-items
+# Optional; defaults to the Postgres seed project (make seed-dev)
+NEXT_PUBLIC_CHURA_PROJECT_ID=11111111-1111-4111-8111-111111111111
 ```
+
+Backlog work items use the seeded dev project id
+(`11111111-1111-4111-8111-111111111111`) from
+`backend/scripts/seed/dev_project.sql`. Run `make migrate` then `make seed-dev`
+(`make setup` runs both).
 
 `KEYCLOAK_CLIENT_SECRET` remains empty for the imported public Keycloak client.
 Every frontend page requires a Keycloak session. After login, the server
