@@ -1,7 +1,11 @@
-// k6 load test: sprint + work item flow against the local dev stack.
+// k6 load test: sprint + work item flow against the Kong gateway (:8083).
 //
+//   make up               Keycloak + Docker API stack (required)
 //   make loadtest         full ramping run
 //   make loadtest-smoke   1 VU, 1 iteration (checks the flow works)
+//
+// `make dev` (backend-split on :8056–:8059) does not expose :8083; use make up or
+// set BASE_URL to a single service (not the full flow).
 //
 // Each VU logs in once (re-logging in before its token expires), then loops:
 // create sprint -> create work item (WS) -> put item in sprint (WS) ->

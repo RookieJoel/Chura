@@ -1,11 +1,10 @@
 import { comments } from "@/lib/mock-data";
+import { defaultProjectId } from "@/lib/dev-project";
 import type { WorkItem, WorkItemComment, WorkItemType, WorkItemStatus, Priority } from "@/types/work-item";
 
 const WORK_ITEMS_RPC_URL =
   process.env.NEXT_PUBLIC_WORK_ITEM_RPC_URL ??
   "ws://127.0.0.1:8083/ws/work-items";
-const DEFAULT_PROJECT_ID =
-  process.env.NEXT_PUBLIC_CHURA_PROJECT_ID ?? "project-1";
 const RPC_TIMEOUT_MS = 10_000;
 
 type RpcWorkItem = Record<string, unknown>;
@@ -37,10 +36,19 @@ interface RpcResponse {
   data?: RpcWorkItem | RpcWorkItem[];
 }
 
+function pascalToSnake(name: string): string {
+  if (name === "ID") return "id";
+  return name
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+    .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+    .toLowerCase();
+}
+
 function readField<T>(item: RpcWorkItem, name: string): T | undefined {
-  return (item[name] ?? item[name.charAt(0).toLowerCase() + name.slice(1)]) as
-    | T
-    | undefined;
+  const camel = name.charAt(0).toLowerCase() + name.slice(1);
+  const snake = pascalToSnake(name);
+  const value = item[name] ?? item[camel] ?? item[snake];
+  return value as T | undefined;
 }
 
 function toWorkItem(item: RpcWorkItem): WorkItem {
@@ -70,19 +78,19 @@ function toWorkItem(item: RpcWorkItem): WorkItem {
   };
 }
 
-function toRpcWorkItem(input: WorkItemInput, id?: string) {
+function toRpcWorkItem(input: WorkItemInput, projectId: string, id?: string) {
   return {
-    ...(id ? { ID: id } : {}),
-    ProjectID: input.projectId ?? DEFAULT_PROJECT_ID,
-    Title: input.title,
-    Description: input.description ?? "",
-    Type: input.type === "story" ? "user_story" : input.type ?? "task",
-    Status: input.status === "todo" ? "to_do" : input.status ?? "to_do",
-    Priority: input.priority === "highest" ? "critical" : input.priority ?? "medium",
-    AssigneeID: input.assigneeId ?? "",
-    ReporterID: input.reporterId ?? "",
-    StoryPoints: input.storyPoints ?? 0,
-    Features: input.features ?? {},
+    ...(id ? { id } : {}),
+    project_id: projectId,
+    title: input.title,
+    description: input.description ?? "",
+    type: input.type === "story" ? "user_story" : input.type ?? "task",
+    status: input.status === "todo" ? "to_do" : input.status ?? "to_do",
+    priority: input.priority === "highest" ? "critical" : input.priority ?? "medium",
+    assignee_id: input.assigneeId ?? "",
+    reporter_id: input.reporterId ?? "",
+    story_points: input.storyPoints ?? 0,
+    features: input.features ?? {},
   };
 }
 
@@ -131,9 +139,10 @@ export interface ListWorkItemsParams {
 export async function listWorkItems(
   params: ListWorkItemsParams = {},
 ): Promise<WorkItem[]> {
+  const projectId = defaultProjectId(params.projectId);
   const response = await callWorkItemRpc({
     operation: "list",
-    project_id: params.projectId ?? DEFAULT_PROJECT_ID,
+    project_id: projectId,
   });
   const items = response.work_items ?? (Array.isArray(response.data) ? response.data : []);
   const workItems = items.map(toWorkItem);
@@ -149,9 +158,10 @@ export async function getWorkItem(id: string): Promise<WorkItem | null> {
 }
 
 export async function createWorkItem(input: CreateWorkItemInput): Promise<WorkItem> {
+  const projectId = defaultProjectId(input.projectId);
   const response = await callWorkItemRpc({
     operation: "create",
-    work_item: toRpcWorkItem(input),
+    work_item: toRpcWorkItem(input, projectId),
   });
   const item = response.work_item ?? (response.data && !Array.isArray(response.data) ? response.data : undefined);
   if (!item) throw new Error("Create Work Item response did not include a work item");
@@ -159,9 +169,10 @@ export async function createWorkItem(input: CreateWorkItemInput): Promise<WorkIt
 }
 
 export async function updateWorkItem(input: UpdateWorkItemInput): Promise<WorkItem> {
+  const projectId = defaultProjectId(input.projectId);
   const response = await callWorkItemRpc({
     operation: "update",
-    work_item: toRpcWorkItem(input, input.id),
+    work_item: toRpcWorkItem(input, projectId, input.id),
   });
   const item = response.work_item ?? (response.data && !Array.isArray(response.data) ? response.data : undefined);
   if (!item) throw new Error("Update Work Item response did not include a work item");

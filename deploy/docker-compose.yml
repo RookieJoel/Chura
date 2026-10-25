@@ -1,7 +1,7 @@
 x-agile-execution-environment: &agile-execution-environment
   MONGODB_URI: mongodb://mongo-db:27017
   MONGODB_DATABASE: chura
-  PORT: 8083
+  CONSUL_HTTP_ADDR: http://consul:8500
   KC_JWKS_ENDPOINT: http://keycloak:8080/realms/chura/protocol/openid-connect/certs
   KC_BASE_URL: http://keycloak:8080
   KC_REALM: chura
@@ -10,8 +10,7 @@ x-agile-execution-environment: &agile-execution-environment
   RABBITMQ_URL: amqp://${RABBITMQ_USER:-chura_dev}:${RABBITMQ_PASSWORD:-change_me_dev}@rabbitmq:5672/
   DATABASE_URL: postgresql://chura:admin@postgre-db:5432/chura
 
-# Shared by the API replicas below. They publish no ports: Kong is the only
-# way in, and it load-balances across them (see kong/kong.yml).
+# Domain services register with Consul; Kong is the only public entry (see kong/kong.yml).
 x-agile-execution-api: &agile-execution-api
   build:
     context: ../backend
@@ -19,6 +18,8 @@ x-agile-execution-api: &agile-execution-api
   env_file:
     - ../backend/.env
   depends_on:
+    consul:
+      condition: service_healthy
     mongo-db:
       condition: service_healthy
     rabbitmq:
@@ -34,7 +35,6 @@ x-agile-execution-api: &agile-execution-api
 
 name: chura-agile-execution-service
 services:
-  
   mongo-db:
     image: mongo:8
     container_name: chura-agile-execution-mongodb
@@ -45,7 +45,8 @@ services:
     volumes:
       - agile-execution-mongodb-data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping').ok\""]
+      test:
+        ["CMD-SHELL", 'mongosh --quiet --eval "db.adminCommand(''ping'').ok"']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -72,51 +73,92 @@ services:
     networks:
       - agile-execution-api
 
-  agile-execution-api-1:
-    <<: *agile-execution-api
-    container_name: chura-agile-execution-api-1
-    environment:
-      <<: *agile-execution-environment
-      INSTANCE_NAME: api-1
+  consul:
+    image: hashicorp/consul:1.20
+    container_name: chura-consul
+    command: agent -server -bootstrap-expect=1 -ui -client=0.0.0.0 -bind=0.0.0.0
+    ports:
+      - "8500:8500"
+      - "8600:8600/tcp"
+      - "8600:8600/udp"
+    healthcheck:
+      test: ["CMD", "consul", "info"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - agile-execution-api
 
-  agile-execution-api-2:
+  chura-analytics:
     <<: *agile-execution-api
-    container_name: chura-agile-execution-api-2
+    command: ["/app/analytics"]
     environment:
       <<: *agile-execution-environment
-      INSTANCE_NAME: api-2
+      PORT: 8056
+      CONSUL_SERVICE_NAME: chura-analytics
+      INSTANCE_NAME: analytics-1
 
-  agile-execution-api-3:
+  chura-sprint:
     <<: *agile-execution-api
-    container_name: chura-agile-execution-api-3
+    command: ["/app/sprint"]
     environment:
       <<: *agile-execution-environment
-      INSTANCE_NAME: api-3
+      PORT: 8057
+      CONSUL_SERVICE_NAME: chura-sprint
+      INSTANCE_NAME: sprint-1
+
+  chura-project:
+    <<: *agile-execution-api
+    command: ["/app/project"]
+    environment:
+      <<: *agile-execution-environment
+      PORT: 8059
+      CONSUL_SERVICE_NAME: chura-project
+      INSTANCE_NAME: project-1
+
+  chura-workitem:
+    <<: *agile-execution-api
+    command: ["/app/workitem"]
+    environment:
+      <<: *agile-execution-environment
+      PORT: 8058
+      CONSUL_SERVICE_NAME: chura-workitem
+      INSTANCE_NAME: workitem-1
 
   kong:
     # 2.8 rather than 3.x: Konga only fully supports Kong 2.x.
     image: kong:2.8
     container_name: chura-kong
+    platform: linux/amd64
     environment:
       # DB-less: all config comes from kong/kong.yml; edit the file, not Konga
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /kong/kong.yml
       KONG_PROXY_LISTEN: 0.0.0.0:8000
       KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_DNS_STALE_TTL: 4
+      KONG_DNS_NOT_FOUND_TTL: 30
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
+    entrypoint: ["/kong-entrypoint.sh"]
     volumes:
       - ./kong/kong.yml:/kong/kong.yml:ro
+      - ./kong/entrypoint.sh:/kong-entrypoint.sh:ro
     ports:
       # Kong takes over the API's port, so the frontend needs no change
       - "8083:8000"
       - "127.0.0.1:8001:8001"
     depends_on:
-      agile-execution-api-1:
+      consul:
+        condition: service_healthy
+      chura-analytics:
         condition: service_started
-      agile-execution-api-2:
+      chura-sprint:
         condition: service_started
-      agile-execution-api-3:
+      chura-project:
+        condition: service_started
+      chura-workitem:
         condition: service_started
     healthcheck:
       test: ["CMD", "kong", "health"]
