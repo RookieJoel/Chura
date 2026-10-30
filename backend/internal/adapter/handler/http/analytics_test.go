@@ -209,6 +209,32 @@ func TestExportReviewSummary_SendsFileWithHeaders(t *testing.T) {
 	}
 }
 
+func TestExportReviewSummary_SanitizesFilenameAndDisablesSniffing(t *testing.T) {
+	app := analyticsApp(stubAnalyticsService{exportFn: func(_ domain.Actor, _ string, _ domain.ReportFormat, _ []domain.MetricKey) (*domain.ExportedReport, error) {
+		return &domain.ExportedReport{Filename: "../../etc/pass\"wd\r\nX-Evil: 1.md", ContentType: "text/markdown; charset=utf-8", Data: []byte("# Review")}, nil
+	}})
+
+	req := httptest.NewRequest(nethttp.MethodGet, "/api/v1/sprints/7/review-summary/export?format=md", bytes.NewReader(nil))
+	for k, v := range memberHeaders {
+		req.Header.Set(k, v)
+	}
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if cd := resp.Header.Get("Content-Disposition"); cd != `attachment; filename="pass-wd-X-Evil-1.md"` {
+		t.Fatalf("content disposition = %q", cd)
+	}
+	if resp.Header.Get("X-Evil") != "" {
+		t.Fatalf("header injection via filename")
+	}
+	if got := resp.Header.Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("X-Content-Type-Options = %q", got)
+	}
+}
+
 func TestExportReviewSummary_UnknownFormatIs400WithoutCallingService(t *testing.T) {
 	app := analyticsApp(stubAnalyticsService{})
 
