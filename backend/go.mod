@@ -1,6 +1,6 @@
 module github.com/RookieJoel/Chura/backend
 
-go 1.26.9
+go 1.26.10
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.8.2
@@ -13,8 +13,8 @@ require (
 	github.com/hashicorp/consul/api v1.35.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/joho/godotenv v1.5.1
-	github.com/rabbitmq/amqp091-go v1.10.0
-	go.mongodb.org/mongo-driver v1.17.4
+	github.com/rabbitmq/amqp091-go v1.14.0
+	go.mongodb.org/mongo-driver v1.17.7
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 	gorm.io/driver/postgres v1.6.3
