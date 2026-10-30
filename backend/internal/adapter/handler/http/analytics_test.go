@@ -235,6 +235,27 @@ func TestExportReviewSummary_SanitizesFilenameAndDisablesSniffing(t *testing.T) 
 	}
 }
 
+func TestExportReviewSummary_RefusesNonDownloadContentType(t *testing.T) {
+	app := analyticsApp(stubAnalyticsService{exportFn: func(_ domain.Actor, _ string, _ domain.ReportFormat, _ []domain.MetricKey) (*domain.ExportedReport, error) {
+		return &domain.ExportedReport{Filename: "sprint-7-review.html", ContentType: "text/html; charset=utf-8", Data: []byte("<script>alert(1)</script>")}, nil
+	}})
+
+	req := httptest.NewRequest(nethttp.MethodGet, "/api/v1/sprints/7/review-summary/export?format=md", bytes.NewReader(nil))
+	for k, v := range memberHeaders {
+		req.Header.Set(k, v)
+	}
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != 500 || bytes.Contains(body, []byte("<script>")) {
+		t.Fatalf("status=%d body=%q", resp.StatusCode, body)
+	}
+}
+
 func TestExportReviewSummary_UnknownFormatIs400WithoutCallingService(t *testing.T) {
 	app := analyticsApp(stubAnalyticsService{})
 
