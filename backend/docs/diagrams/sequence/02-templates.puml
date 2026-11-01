@@ -1,0 +1,42 @@
+@startuml 02-templates
+!include _style.puml
+title getAvailableTemplates() / retrieveTemplateDefinition()
+
+actor "Client" as C
+participant "KeycloakAuth\nmiddleware" as MW
+participant "TemplateHandler" as TH
+participant "ProjectConfigurationService" as PCS
+participant "domain\n(template catalog)" as D
+
+== GET /api/v1/templates ==
+C -> MW : GET /api/v1/templates (Bearer)
+MW -> MW : verify JWT -> Actor
+MW -> TH : List
+TH -> PCS : GetAvailableTemplates(ctx, actor)
+PCS -> PCS : actor.Validate()
+PCS -> D : AvailableTemplates()
+D --> PCS : []Template
+PCS --> TH : []Template
+TH --> C : 200 [Template...]
+
+== GET /api/v1/templates/:id ==
+C -> MW : GET /api/v1/templates/:id (Bearer)
+MW -> TH : Get
+TH -> PCS : RetrieveTemplateDefinition(ctx, actor, id)
+PCS -> PCS : actor.Validate()
+PCS -> D : TemplateByID(id)
+alt template not found
+  D --> PCS : ok = false
+  PCS --> TH : ErrNotFound
+  TH --> C : 404 not found
+else found
+  D --> PCS : Template
+  PCS --> TH : Template
+  TH --> C : 200 Template
+end
+
+note right of D
+  Template เป็น catalog ในโค้ด (in-memory)
+  ไม่มีการอ่านจากฐานข้อมูล
+end note
+@enduml

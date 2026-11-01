@@ -1,0 +1,66 @@
+@startuml 12-notification-consumer
+!include _style.puml
+title Notification - RabbitMQ consumer -> e-mail via SMTP
+
+participant "WorkItemService" as S
+queue "RabbitMQ\nexchange: chura.events" as MQ
+participant "rabbitmq.Consumer\n(goroutine)" as CON
+participant "NotificationEventHandler" as H
+participant "NotificationService" as NS
+participant "Keycloak\nNotificationRecipientRepository" as KC
+participant "SMTPSender" as SMTP
+
+== Producers ==
+S ->> MQ : "workitem.status_changed" / "workitem.assigned" /\n"workitem.unassigned" (from UpdateWorkItem)
+S ->> MQ : "sprint.finished" {sprint_id, reporter_ids}\n(from CheckSprintFinished when every item is done)
+note right of S
+  CheckSprintFinished ยังไม่ถูกเปิดเป็น endpoint
+  (มีใน port in.WorkItemService และ test เท่านั้น)
+end note
+
+== Consumer (bound to all 4 routing keys) ==
+MQ -> CON : deliver message (manual ack)
+activate CON
+CON -> H : HandleNotificationMessage(body)
+activate H
+H -> H : json.Unmarshal
+alt bad JSON
+  H --> CON : requeue = false, error
+  CON ->> MQ : Nack(requeue=false)
+end
+
+alt event_type == "" (sprint.finished)
+  H -> NS : SendSprintFinishedNotifications(sprintID, reporterIDs)
+  loop each unique reporter
+    NS -> NS : SendToReporter(id, "Sprint finished", body)
+  end
+else "workitem.status_changed"
+  H -> NS : SendWorkItemNotification(assignee & reporter, "Work item status changed")
+else "workitem.assigned"
+  H -> NS : SendWorkItemNotification(assignee, "Work item assigned")
+else "workitem.unassigned"
+  H -> NS : SendWorkItemNotification(previous assignee, "Work item unassigned")
+else unknown event
+  H --> CON : requeue = true, error
+  CON ->> MQ : Nack(requeue=true)
+end
+
+group SendWorkItemNotification(userID, subject, body)
+  NS -> KC : GetEmailByUserID(userID)
+  KC -> KC : directory.FindUserByID (Admin API)
+  KC --> NS : email
+  NS -> SMTP : Send(email, subject, body)
+  SMTP --> NS : ok / error
+end
+
+NS --> H : nil / error
+alt send failed
+  H --> CON : requeue = true, error
+  CON ->> MQ : Nack(requeue=true)
+else success
+  H --> CON : requeue = false, nil
+  CON ->> MQ : Ack
+end
+deactivate H
+deactivate CON
+@enduml

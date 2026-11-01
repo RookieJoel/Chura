@@ -1,0 +1,57 @@
+@startuml 08-create-work-item
+!include _style.puml
+title createWorkItem() - WebSocket -> gRPC (client stream) -> WorkItemService -> MongoDB
+
+actor "User" as User
+participant "Frontend\n(api/work-items.ts)" as FE
+box "Backend process" #EEFFEE
+  participant "WebSocket handler\n/ws/work-items" as WS
+  participant "WorkItemGateway\n(gRPC client)" as GW
+  participant "gRPC Server\n(WorkItemService)" as GS
+  participant "WorkItemService" as S
+end box
+database "MongoDB\n(work_items)" as M
+
+User -> FE : fill form + Create
+FE -> WS : open ws://.../ws/work-items
+FE -> WS : {"operation":"create", "work_item":{...}}
+activate WS
+WS -> WS : handleWorkItemMessage()
+WS -> GW : CreateWorkItem(item)
+activate GW
+GW -> GS : CreateWorkItems() open stream
+GW -> GS : stream.Send(CreateWorkItemRequest)
+GW -> GS : stream.CloseSend()
+activate GS
+GS -> GS : workItemFromInput(proto -> domain)
+GS -> S : CreateWorkItem(item)
+activate S
+S -> S : item.Validate()
+alt validation failed
+  S --> GS : error
+  GS --> GW : status InvalidArgument
+  GW --> WS : error
+  WS --> FE : {"operation":"created","error":"..."}
+end
+S -> S : ID = uuid, CreatedAt = UpdatedAt = now
+S -> M : repository.Create(item)
+M --> S : WorkItem
+S --> GS : WorkItem
+deactivate S
+GS -> GS : workItemToProto()
+GS --> GW : stream.Send(WorkItem)
+deactivate GS
+GW -> GW : workItemFromProto()
+GW --> WS : WorkItem
+deactivate GW
+WS --> FE : {"operation":"created","work_item":{...}}
+deactivate WS
+FE -> FE : toWorkItem() + close socket
+FE --> User : show new card
+
+note over WS, GS
+  WebSocket handler กับ gRPC server รันอยู่ใน process เดียวกัน
+  gateway ต่อเข้า localhost:GRPC_PORT (insecure)
+  ปัจจุบัน /ws/work-items ไม่ผ่าน KeycloakAuth middleware
+end note
+@enduml

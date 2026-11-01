@@ -1,0 +1,60 @@
+@startuml 18-review-summary-and-export
+!include _style.puml
+title generateSprintReviewSummary() / exportSummaryReport()
+
+actor "Team Member / Auditor" as C
+participant "KeycloakAuth\nmiddleware" as MW
+participant "AnalyticsHandler" as AH
+participant "AnalyticsReportingService" as AS
+participant "ProjectConfigurationService\n(Project + Template Gateway)" as PCS
+database "PostgreSQL\n(sprints, reflections)" as PG
+database "MongoDB\n(work_items)" as M
+participant "ReportExporter\n(CSV | Markdown)" as EX
+
+== GET /api/v1/sprints/:id/review-summary?metrics=a,b ==
+C -> MW : GET /api/v1/sprints/:id/review-summary?metrics=...
+MW -> AH : ReviewSummary
+AH -> AH : metricsQuery() -> []MetricKey
+AH -> AS : GenerateSprintReviewSummary(ctx, actor, sprintID, metrics)
+activate AS
+group buildSummary
+  AS -> PG : sprints.GetByID(sprintID)
+  PG --> AS : *Sprint
+  AS -> PCS : RetrieveProjectData(ctx, actor, projectID)
+  PCS --> AS : *Project
+  AS -> PCS : RetrieveTemplateDefinition(templateID)
+  PCS --> AS : Template
+  AS -> AS : template.SprintReview.SelectMetrics(metrics)
+  alt unknown metric
+    AS --> AH : InvalidInputError
+    AH --> C : 400 invalid input
+  end
+  AS -> M : workItems.ListBySprint(projectID, sprintID)
+  M --> AS : []WorkItem
+  AS -> PG : reflections.ListBySprint(sprintID)
+  PG --> AS : []SprintReflection
+  AS -> AS : domain.BuildSprintReviewSummary(ReviewInput)
+end
+AS --> AH : *SprintReviewSummary
+deactivate AS
+AH --> C : 200 SprintReviewSummary
+
+== GET /api/v1/sprints/:id/review-summary/export?format=csv|markdown|md ==
+C -> MW : GET .../review-summary/export?format=csv&metrics=...
+MW -> AH : ExportReviewSummary
+AH -> AH : domain.ParseReportFormat(format)\n("" -> csv, "md" -> markdown)
+alt unsupported format
+  AH --> C : 400 invalid input
+end
+AH -> AS : ExportSummaryReport(ctx, actor, sprintID, format, metrics)
+activate AS
+AS -> AS : exporters[format]
+AS -> AS : buildSummary() (same as above)
+AS -> EX : Export(summary)
+EX --> AS : []byte
+AS -> AS : ExportedReport{Filename = sprint-<id>-review.<ext>,\nContentType, Data}
+AS --> AH : *ExportedReport
+deactivate AS
+AH -> AH : Attachment(filename)\nSet Content-Type
+AH --> C : 200 file download
+@enduml

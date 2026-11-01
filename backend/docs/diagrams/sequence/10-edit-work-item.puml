@@ -1,0 +1,50 @@
+@startuml 10-edit-work-item
+!include _style.puml
+title editWorkItem() - update + publish domain events to RabbitMQ
+
+participant "Frontend\n(api/work-items.ts)" as FE
+participant "WebSocket handler\n/ws/work-items" as WS
+participant "WorkItemGateway\n(gRPC client)" as GW
+participant "gRPC Server" as GS
+participant "WorkItemService" as S
+database "MongoDB\n(work_items)" as M
+queue "RabbitMQ\nexchange: chura.events\n(topic)" as MQ
+
+FE -> WS : {"operation":"update","work_item":{ID, ...}}
+WS -> WS : if work_item.ID empty -> use message.id
+WS -> GW : UpdateWorkItem(item)
+GW -> GS : UpdateWorkItem(id, WorkItemInput)
+GS -> S : UpdateWorkItem(item)
+activate S
+S -> S : require ID + item.Validate()
+S -> M : repository.Get(id)
+M --> S : existing
+S -> S : keep CreatedAt\nkeep SprintID if empty\nUpdatedAt = now
+S -> M : repository.Update(item)
+M --> S : updated
+
+opt existing.Status != updated.Status
+  S ->> MQ : Publish("workitem.status_changed",\n{work_item_id, title, reporter_id, assignee_id,\nold_status, new_status})
+end
+opt existing.AssigneeID != updated.AssigneeID
+  alt new assignee is empty
+    S ->> MQ : Publish("workitem.unassigned", {..., previous_assignee_id})
+  else
+    S ->> MQ : Publish("workitem.assigned", {..., previous_assignee_id})
+  end
+end
+alt publish failed
+  S --> GS : error "publish ... event"
+else
+  S --> GS : updated
+end
+deactivate S
+GS --> GW : WorkItem / InvalidArgument / NotFound
+GW --> WS : WorkItem / error
+WS --> FE : {"operation":"updated", "work_item" | "error"}
+
+note right of MQ
+  consumer ฝั่ง Notification จะรับ event เหล่านี้
+  ดู 12-notification-consumer.puml
+end note
+@enduml

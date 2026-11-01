@@ -1,0 +1,47 @@
+@startuml 15-edit-and-delete-sprint
+!include _style.puml
+title editSprint() / deleteSprint() - PUT and DELETE /api/v1/sprints/:id
+
+actor "Team Member" as C
+participant "KeycloakAuth\nmiddleware" as MW
+participant "SprintHandler" as SH
+participant "SprintService" as SS
+participant "ProjectConfigurationService\n(ProjectGateway)" as PCS
+database "PostgreSQL\n(sprints)" as PG
+
+== Edit sprint ==
+C -> MW : PUT /api/v1/sprints/:id {name, team, start_date, end_date, status}
+MW -> SH : Update
+SH -> SH : decodeSprint()\nsprint.ID = :id, sprint.ProjectID = "" (immutable)
+SH -> SS : UpdateSprint(ctx, actor, id, sprint)
+activate SS
+group loadMutable
+  SS -> PG : GetByID(id)
+  PG --> SS : *Sprint / ErrNotFound
+  SS -> PCS : RetrieveProjectData(ctx, actor, sprint.ProjectID)
+  PCS --> SS : *Project / ErrNotProjectMember
+  SS -> SS : actor.RequireTeamMember()
+end
+alt not found / not member / Auditor
+  SS --> SH : error
+  SH --> C : 404 / 403
+end
+SS -> SS : sprint.Validate()
+SS -> PG : repository.Update(id, sprint)
+PG --> SS : *Sprint
+SS --> SH : *Sprint
+deactivate SS
+SH --> C : 200 Sprint
+
+== Delete sprint ==
+C -> MW : DELETE /api/v1/sprints/:id
+MW -> SH : Delete
+SH -> SS : DeleteSprint(ctx, actor, id)
+activate SS
+SS -> SS : loadMutable(id) (same as above)
+SS -> PG : repository.Delete(id)
+PG --> SS : ok
+SS --> SH : nil
+deactivate SS
+SH --> C : 204 No Content
+@enduml

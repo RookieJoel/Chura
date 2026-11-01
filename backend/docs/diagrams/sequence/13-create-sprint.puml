@@ -1,0 +1,45 @@
+@startuml 13-create-sprint
+!include _style.puml
+title createSprint() - POST /api/v1/sprints
+
+actor "Team Member" as C
+participant "KeycloakAuth\nmiddleware" as MW
+participant "SprintHandler" as SH
+participant "SprintService" as SS
+participant "ProjectConfigurationService\n(ProjectGateway)" as PCS
+database "PostgreSQL\n(sprints)" as PG
+
+C -> MW : POST /api/v1/sprints\n{project_id, name, team, start_date, end_date, status}
+MW -> MW : verify JWT -> Actor
+MW -> SH : Create
+activate SH
+SH -> SH : decodeSprint() + parseDate(YYYY-MM-DD)
+alt invalid JSON / bad date format
+  SH --> C : 400 invalid input
+end
+SH -> SS : CreateSprint(ctx, actor, sprint)
+activate SS
+SS -> SS : actor.RequireTeamMember()
+alt Auditor
+  SS --> SH : ErrForbidden
+  SH --> C : 403 forbidden
+end
+SS -> SS : parseProjectID() (required + UUID)
+SS -> PCS : RetrieveProjectData(ctx, actor, projectID)
+PCS --> SS : *Project / ErrNotFound / ErrNotProjectMember
+alt project not visible
+  SS --> SH : error
+  SH --> C : 404 / 403
+end
+SS -> SS : sprint.Validate()\n(status "" -> planned; name, team, status, dates)
+alt invalid (e.g. end before start)
+  SS --> SH : InvalidInputError
+  SH --> C : 400 invalid input
+end
+SS -> PG : repository.Create(sprint)
+PG --> SS : *Sprint
+SS --> SH : *Sprint
+deactivate SS
+SH --> C : 201 Sprint
+deactivate SH
+@enduml

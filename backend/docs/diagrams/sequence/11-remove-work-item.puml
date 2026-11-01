@@ -1,0 +1,33 @@
+@startuml 11-remove-work-item
+!include _style.puml
+title removeWorkItem() - delete over WebSocket -> gRPC
+
+participant "Frontend\n(api/work-items.ts)" as FE
+participant "WebSocket handler\n/ws/work-items" as WS
+participant "WorkItemGateway\n(gRPC client)" as GW
+participant "gRPC Server" as GS
+participant "WorkItemService" as S
+database "MongoDB\n(work_items)" as M
+
+FE -> WS : {"operation":"delete","id":"..."}
+WS -> GW : DeleteWorkItem(id)
+GW -> GS : DeleteWorkItem(DeleteWorkItemRequest)
+GS -> S : DeleteWorkItem(id)
+alt id is blank
+  S --> GS : error "id is required"
+  GS --> GW : InvalidArgument
+else
+  S -> M : repository.Delete(id)
+  alt not found
+    M --> S : ErrNotFound
+    S --> GS : ErrNotFound
+    GS --> GW : NotFound
+  else deleted
+    M --> S : ok
+    S --> GS : nil
+    GS --> GW : Empty
+  end
+end
+GW --> WS : nil / error
+WS --> FE : {"operation":"deleted"} or {"operation":"deleted","error":"..."}
+@enduml

@@ -1,0 +1,48 @@
+@startuml 04-retrieve-project-data
+!include _style.puml
+title retrieveProjectData() - GET /api/v1/projects/:id
+
+actor "Team Member / Auditor" as C
+participant "KeycloakAuth\nmiddleware" as MW
+participant "ProjectHandler" as PH
+participant "ProjectConfigurationService" as PCS
+database "PostgreSQL\n(projects)" as PG
+participant "Keycloak Directory\n(Admin API)" as KC
+
+C -> MW : GET /api/v1/projects/:id
+MW -> MW : verify JWT -> Actor
+MW -> PH : Get
+PH -> PCS : RetrieveProjectData(ctx, actor, id)
+activate PCS
+group loadVisible
+  PCS -> PCS : actor.Validate()
+  PCS -> PCS : uuid.Parse(id)
+  alt id is not a UUID
+    PCS --> PH : ErrInvalidID
+    PH --> C : 400 invalid id
+  end
+  PCS -> PG : GetByID(id)
+  alt not found
+    PG --> PCS : ErrNotFound
+    PCS --> PH : ErrNotFound
+    PH --> C : 404 not found
+  end
+  PG --> PCS : Project
+  PCS -> KC : ListMembers(groupID, projectID)
+  KC --> PCS : []Member (with project role)
+  alt actor.Role == Auditor
+    PCS -> PCS : allow (Auditor sees every project)
+  else Team Member but not in Members
+    PCS --> PH : ErrNotProjectMember
+    PH --> C : 403 you are not a member of this project
+  end
+end
+PCS --> PH : *Project
+deactivate PCS
+PH --> C : 200 Project
+
+note right of PCS
+  loadVisible ถูกใช้ซ้ำโดย Sprint และ Analytics
+  ผ่าน ProjectGateway.RetrieveProjectData()
+end note
+@enduml

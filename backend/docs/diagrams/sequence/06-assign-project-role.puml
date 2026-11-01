@@ -1,0 +1,47 @@
+@startuml 06-assign-project-role
+!include _style.puml
+title assignProjectRole() - PUT /api/v1/projects/:id/members/:userId/role
+
+actor "Team Member" as C
+participant "KeycloakAuth\nmiddleware" as MW
+participant "ProjectHandler" as PH
+participant "ProjectConfigurationService" as PCS
+database "PostgreSQL\n(projects)" as PG
+participant "Keycloak Directory\n(Admin API)" as KC
+
+C -> MW : PUT /api/v1/projects/:id/members/:userId/role\n{role}
+MW -> MW : verify JWT -> Actor
+MW -> PH : AssignRole
+PH -> PCS : AssignProjectRole(ctx, actor, projectID, userID, role)
+activate PCS
+
+PCS -> PCS : loadMutable(projectID)\n(GetByID + ListMembers + RequireTeamMember)
+PCS -> PCS : templateOf(project)
+alt role not in template.Roles
+  PCS --> PH : InvalidInputError
+  PH --> C : 400 invalid input
+end
+
+PCS -> PG : WithMembershipLock(projectID, fn)
+activate PG
+PG -> PCS : fn(ctx)
+PCS -> KC : ListMembers(groupID) (refreshMembers)
+KC --> PCS : []Member
+PCS -> PCS : keepCreatorRoleGuard(userID, role, creatorRole)
+alt target is not a member
+  PCS --> PH : ErrNotFound
+  PH --> C : 404 not found
+else would remove the last holder of the creator role
+  PCS --> PH : ErrConflict
+  PH --> C : 409 conflict
+else ok
+  PCS -> KC : SetMemberRole(projectID, userID, role)\n(write user role attribute)
+  KC --> PCS : ok
+end
+deactivate PG
+
+PCS -> PCS : loadVisible(projectID)
+PCS --> PH : *Project
+deactivate PCS
+PH --> C : 200 Project
+@enduml

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(java -version)",
+      "Read(//c/Users/jirap/.vscode/extensions/**)",
+      "Bash(java -jar ~/.vscode/extensions/jebbs.plantuml-2.18.1/plantuml.jar -tsvg -charset UTF-8 -o \"C:/Users/jirap/AppData/Local/Temp/claude/f--Programing-4-1-Soft-Arc-Chura/5b6c2db1-7c22-4201-babe-227f89520687/scratchpad/svg\" -failfast2 \"[0-9]*.puml\")",
+      "Bash(echo \"exit=$?\")"
+    ]
+  }
+}

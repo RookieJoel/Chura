@@ -1,0 +1,35 @@
+@startuml 07-validate-work-item-attributes
+!include _style.puml
+title validateWorkItemAttributes() - POST /api/v1/projects/:id/work-items/validate
+
+actor "Team Member / Auditor" as C
+participant "KeycloakAuth\nmiddleware" as MW
+participant "ProjectHandler" as PH
+participant "ProjectConfigurationService" as PCS
+database "PostgreSQL\n(projects)" as PG
+participant "Keycloak Directory\n(Admin API)" as KC
+participant "domain" as D
+
+C -> MW : POST /api/v1/projects/:id/work-items/validate\n{type, title, description, story_points, acceptance_criteria}
+MW -> MW : verify JWT -> Actor
+MW -> PH : ValidateWorkItem
+PH -> PH : BodyParser -> WorkItemAttributes
+PH -> PCS : ValidateWorkItemAttributes(ctx, actor, projectID, attrs)
+activate PCS
+PCS -> PG : GetByID(projectID)
+PG --> PCS : Project
+PCS -> KC : ListMembers(groupID)
+KC --> PCS : []Member
+PCS -> PCS : check visibility (loadVisible)
+PCS -> PCS : templateOf(project)
+PCS -> D : ValidateWorkItemAttributes(template, attrs)
+D --> PCS : ValidationResult{valid, violations}
+PCS --> PH : ValidationResult
+deactivate PCS
+PH --> C : 200 ValidationResult
+
+note right of D
+  ผลลัพธ์ invalid ก็ยังตอบ 200
+  โดยบอก violations ใน body
+end note
+@enduml

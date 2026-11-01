@@ -1,0 +1,47 @@
+@startuml 16-sprint-work-summary-and-metrics
+!include _style.puml
+title calculateSprintWorkSummary() / retrieveSprintMetrics()
+
+actor "Team Member / Auditor" as C
+participant "KeycloakAuth\nmiddleware" as MW
+participant "AnalyticsHandler" as AH
+participant "AnalyticsReportingService" as AS
+database "PostgreSQL\n(sprints)" as PG
+participant "ProjectConfigurationService\n(ProjectGateway)" as PCS
+database "MongoDB\n(work_items)" as M
+participant "domain" as D
+
+== GET /api/v1/sprints/:id/work-summary ==
+C -> MW : GET /api/v1/sprints/:id/work-summary
+MW -> AH : WorkSummary
+AH -> AS : CalculateSprintWorkSummary(ctx, actor, sprintID)
+activate AS
+group loadVisible
+  AS -> AS : actor.Validate()
+  AS -> PG : sprints.GetByID(sprintID)
+  PG --> AS : *Sprint / ErrNotFound
+  AS -> PCS : RetrieveProjectData(ctx, actor, sprint.ProjectID)
+  PCS --> AS : *Project / ErrNotProjectMember
+end
+AS -> M : workItems.ListBySprint(projectID, sprintID)
+M --> AS : []WorkItem
+AS -> D : CalculateSprintWorkSummary(items)
+D --> AS : SprintWorkSummary\n(planned / completed / carry-over / blocked)
+AS --> AH : *SprintWorkSummary
+deactivate AS
+AH --> C : 200 SprintWorkSummary
+
+== GET /api/v1/sprints/:id/metrics ==
+C -> MW : GET /api/v1/sprints/:id/metrics
+MW -> AH : Metrics
+AH -> AS : RetrieveSprintMetrics(ctx, actor, sprintID)
+activate AS
+AS -> AS : loadVisible(sprintID) (same as above)
+AS -> M : workItems.ListBySprint(projectID, sprintID)
+M --> AS : []WorkItem
+AS -> D : CalculateSprintMetrics(sprint, items, now)
+D --> AS : SprintMetrics
+AS --> AH : *SprintMetrics
+deactivate AS
+AH --> C : 200 SprintMetrics
+@enduml
