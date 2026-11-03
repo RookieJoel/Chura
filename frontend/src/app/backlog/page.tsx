@@ -189,20 +189,32 @@ export default function BacklogPage() {
 
   React.useEffect(() => {
     let active = true;
-    Promise.all([listWorkItems(), listMembers(), listSprints()])
-      .then(([items, projectMembers, availableSprints]) => {
-        if (active) {
-          setWorkItems(items);
-          setMembers(projectMembers);
-          setSprints(availableSprints);
-        }
+    void listSprints()
+      .then((availableSprints) => {
+        if (active) setSprints(availableSprints);
       })
       .catch((error) => {
-        if (active) {
-          setListError(
-            error instanceof Error ? error.message : "Unable to load work items",
-          );
-        }
+        if (active) setListError(
+          error instanceof Error ? error.message : "Unable to load sprints",
+        );
+      });
+    void listWorkItems()
+      .then((items) => {
+        if (active) setWorkItems(items);
+      })
+      .catch((error) => {
+        if (active) setListError(
+          error instanceof Error ? error.message : "Unable to load work items",
+        );
+      });
+    void listMembers()
+      .then((projectMembers) => {
+        if (active) setMembers(projectMembers);
+      })
+      .catch((error) => {
+        if (active) setListError(
+          error instanceof Error ? error.message : "Unable to load members",
+        );
       });
 
     return () => {

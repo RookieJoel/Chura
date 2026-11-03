@@ -60,6 +60,15 @@ services:
     port: 8058
     protocol: http
     routes:
+      - name: chura-workitem-item
+        regex_priority: 100
+        paths:
+          - /api/v1/work-items/[^/]+$
+        strip_path: false
+      - name: chura-workitem-collection
+        paths:
+          - /api/v1/work-items
+        strip_path: false
       - name: chura-workitem-ws
         paths:
           - /ws/work-items

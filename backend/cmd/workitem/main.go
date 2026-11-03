@@ -78,6 +78,12 @@ func main() {
 	gateway := workitemgrpc.NewLocalWorkItemGateway(workItemService)
 
 	app := http.NewBaseApp(cfg.FrontendURL, cfg.InstanceName)
+	authMiddleware, err := runtime.AuthMiddleware(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	api := app.Group("/api/v1", authMiddleware)
+	http.RegisterWorkItemRoutes(api, http.NewWorkItemHandler(workItemService))
 	http.RegisterWorkItemWebSocket(app, gateway)
 
 	if err := runtime.ListenAndServe(cfg, app); err != nil {
