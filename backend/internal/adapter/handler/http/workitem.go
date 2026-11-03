@@ -5,10 +5,74 @@ import (
 	"strings"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
+	"github.com/RookieJoel/Chura/backend/internal/port/in"
 	"github.com/RookieJoel/Chura/backend/internal/port/out"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
 )
+
+type WorkItemHandler struct {
+	service in.WorkItemService
+}
+
+func NewWorkItemHandler(service in.WorkItemService) *WorkItemHandler {
+	return &WorkItemHandler{service: service}
+}
+
+func (h *WorkItemHandler) Create(c *fiber.Ctx) error {
+	var item domain.WorkItem
+	if err := c.BodyParser(&item); err != nil {
+		return writeError(c, errInvalidJSONBody)
+	}
+	result, err := h.service.CreateWorkItem(item)
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.Status(fiber.StatusCreated).JSON(result)
+}
+
+func (h *WorkItemHandler) Get(c *fiber.Ctx) error {
+	result, err := h.service.GetWorkItem(c.Params("id"))
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(result)
+}
+
+func (h *WorkItemHandler) List(c *fiber.Ctx) error {
+	if sprintID := strings.TrimSpace(c.Query("sprint_id")); sprintID != "" {
+		result, err := h.service.ListWorkItemsBySprint(sprintID)
+		if err != nil {
+			return writeError(c, err)
+		}
+		return c.JSON(result)
+	}
+	result, err := h.service.ListWorkItems(strings.TrimSpace(c.Query("project_id")))
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(result)
+}
+
+func (h *WorkItemHandler) Update(c *fiber.Ctx) error {
+	var item domain.WorkItem
+	if err := c.BodyParser(&item); err != nil {
+		return writeError(c, errInvalidJSONBody)
+	}
+	item.ID = c.Params("id")
+	result, err := h.service.UpdateWorkItem(item)
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(result)
+}
+
+func (h *WorkItemHandler) Delete(c *fiber.Ctx) error {
+	if err := h.service.DeleteWorkItem(c.Params("id")); err != nil {
+		return writeError(c, err)
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
 
 type workItemMessage struct {
 	Operation string          `json:"operation"`

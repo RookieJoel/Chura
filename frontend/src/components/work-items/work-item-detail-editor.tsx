@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { deleteWorkItem, updateWorkItem } from "@/api/work-items";
-import type { Member, WorkItem, WorkItemComment, WorkItemStatus, WorkItemType, Priority } from "@/types/work-item";
+import type { Member, Sprint, WorkItem, WorkItemComment, WorkItemStatus, WorkItemType, Priority } from "@/types/work-item";
 import { TypeBadge, typeLabel } from "@/components/work-items/type-badge";
 import { PriorityIcon } from "@/components/work-items/priority-icon";
 import { EpicPill } from "@/components/work-items/epic-pill";
@@ -18,11 +18,13 @@ interface WorkItemDetailEditorProps {
   initialItem: WorkItem;
   comments: WorkItemComment[];
   members: Member[];
+  sprints: Sprint[];
 }
 
 type EditableWorkItem = Pick<
   WorkItem,
   | "projectId"
+  | "sprintId"
   | "title"
   | "description"
   | "type"
@@ -76,6 +78,7 @@ export function WorkItemDetailEditor({
   initialItem,
   comments,
   members,
+  sprints,
 }: WorkItemDetailEditorProps) {
   const router = useRouter();
   const [item, setItem] = useState(initialItem);
@@ -99,6 +102,7 @@ export function WorkItemDetailEditor({
       const updatedItem = await updateWorkItem({
         id: nextItem.id,
         projectId: nextItem.projectId,
+        sprintId: nextItem.sprintId,
         title: nextItem.title,
         description: nextItem.description,
         type: nextItem.type,
@@ -452,6 +456,18 @@ export function WorkItemDetailEditor({
                 <option value="">Unknown</option>
                 {members.map((member) => (
                   <option key={member.id} value={member.id}>{member.name}</option>
+                ))}
+              </select>
+            </DetailRow>
+            <DetailRow label="Sprint">
+              <select
+                value={item.sprintId ?? ""}
+                onChange={(event) => saveChanges({ sprintId: event.target.value || null })}
+                className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold outline-none"
+              >
+                <option value="">Backlog</option>
+                {sprints.map((sprint) => (
+                  <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
                 ))}
               </select>
             </DetailRow>

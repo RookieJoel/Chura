@@ -26,6 +26,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return token;
     },
+    async session({ session, token }) {
+      session.accessToken = token.accessToken;
+      session.idToken = token.idToken;
+      return session;
+    },
   },
   cookies: {
     sessionToken: {

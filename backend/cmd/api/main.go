@@ -68,6 +68,10 @@ func main() {
 		sprintService,
 	)
 
+	var workItemRepository out.WorkItemRepository = connections.Mongo.WorkItemsrepository
+	restWorkItemService := service.NewWorkItemService(workItemRepository)
+	workItemHandler := workitemhttp.NewWorkItemHandler(restWorkItemService)
+
 	authHandler := http.NewAuthHandler()
 	templateHandler := http.NewTemplateHandler(projectService)
 	projectHandler := http.NewProjectHandler(projectService)
@@ -97,9 +101,8 @@ func main() {
 		analyticsHandler,
 		cfg.FrontendURL,
 		authMiddleware,
+		workItemHandler,
 	)
-
-	var workItemRepository out.WorkItemRepository = connections.Mongo.WorkItemsrepository
 
 	notificationService := service.NewNotificationService(
 		keycloak.NewNotificationRecipientRepository(directory),

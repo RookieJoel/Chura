@@ -16,6 +16,7 @@ func NewRouter(
 	analyticsHandler *AnalyticsHandler,
 	frontendURL string,
 	authMiddleware fiber.Handler,
+	workItemHandlers ...*WorkItemHandler,
 ) *fiber.App {
 
 	app := fiber.New(fiber.Config{BodyLimit: maxRequestBodyBytes})
@@ -63,6 +64,15 @@ func NewRouter(
 	api.Get("/sprints/:id", sprintHandler.Get)
 	api.Put("/sprints/:id", sprintHandler.Update)
 	api.Delete("/sprints/:id", sprintHandler.Delete)
+
+	if len(workItemHandlers) > 0 && workItemHandlers[0] != nil {
+		workItems := workItemHandlers[0]
+		api.Post("/work-items", workItems.Create)
+		api.Get("/work-items", workItems.List)
+		api.Get("/work-items/:id", workItems.Get)
+		api.Put("/work-items/:id", workItems.Update)
+		api.Delete("/work-items/:id", workItems.Delete)
+	}
 
 	api.Get("/sprints/:id/work-summary", analyticsHandler.WorkSummary)
 	api.Get("/sprints/:id/metrics", analyticsHandler.Metrics)

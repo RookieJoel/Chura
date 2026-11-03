@@ -4,11 +4,11 @@ import { Sidebar } from "@/components/layout/sidebar";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-screen flex-1 flex-col overflow-hidden bg-background">
       <TopNav />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
-        <div className="flex flex-1 flex-col overflow-hidden">{children}</div>
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</main>
       </div>
     </div>
   );

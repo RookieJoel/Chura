@@ -1,17 +1,58 @@
-import { comments } from "@/lib/mock-data";
-import type { WorkItem, WorkItemComment, WorkItemType, WorkItemStatus, Priority } from "@/types/work-item";
+import type {
+  WorkItem,
+  WorkItemComment,
+  WorkItemType,
+  WorkItemStatus,
+  Priority,
+} from "@/types/work-item";
+import { apiRequest } from "@/api/client";
 
-const WORK_ITEMS_RPC_URL =
-  process.env.NEXT_PUBLIC_WORK_ITEM_RPC_URL ??
-  "ws://127.0.0.1:8083/ws/work-items";
 const DEFAULT_PROJECT_ID =
-  process.env.NEXT_PUBLIC_CHURA_PROJECT_ID ?? "project-1";
-const RPC_TIMEOUT_MS = 10_000;
+  process.env.NEXT_PUBLIC_CHURA_PROJECT_ID;
 
-type RpcWorkItem = Record<string, unknown>;
+interface ApiWorkItem {
+  id: string;
+  project_id?: string;
+  sprint_id?: string;
+  title: string;
+  description?: string;
+  type: string;
+  status: string;
+  priority: string;
+  assignee_id?: string;
+  reporter_id?: string;
+  story_points?: number;
+  features?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+function toWorkItem(item: ApiWorkItem): WorkItem {
+  return {
+    id: item.id,
+    projectId: item.project_id,
+    title: item.title,
+    description: item.description,
+    type: item.type === "user_story" ? "story" : (item.type as WorkItemType),
+    status: item.status === "to_do" ? "todo" : (item.status as WorkItemStatus),
+    blocked: item.status === "blocked",
+    priority: item.priority === "critical" ? "highest" : (item.priority as Priority),
+    storyPoints: item.story_points ?? 0,
+    epic: "",
+    assigneeId: item.assignee_id,
+    reporterId: item.reporter_id,
+    sprintId: item.sprint_id || null,
+    labels: [],
+    features: item.features,
+    acceptanceCriteria: [],
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+  };
+}
 
 export interface WorkItemInput {
   projectId?: string;
+  sprintId?: string | null;
   title: string;
   description?: string;
   type?: WorkItemType;
@@ -24,106 +65,30 @@ export interface WorkItemInput {
 }
 
 export type CreateWorkItemInput = WorkItemInput;
-
 export interface UpdateWorkItemInput extends WorkItemInput {
   id: string;
 }
 
-interface RpcResponse {
-  error?: string;
-  message?: string;
-  work_item?: RpcWorkItem;
-  work_items?: RpcWorkItem[];
-  data?: RpcWorkItem | RpcWorkItem[];
-}
-
-function readField<T>(item: RpcWorkItem, name: string): T | undefined {
-  return (item[name] ?? item[name.charAt(0).toLowerCase() + name.slice(1)]) as
-    | T
-    | undefined;
-}
-
-function toWorkItem(item: RpcWorkItem): WorkItem {
-  const status = readField<string>(item, "Status");
-  const type = readField<string>(item, "Type");
-  const priority = readField<string>(item, "Priority");
-
+function toPayload(input: WorkItemInput, id?: string) {
+  const projectId = input.projectId ?? DEFAULT_PROJECT_ID;
+  if (!projectId) throw new Error("NEXT_PUBLIC_CHURA_PROJECT_ID is not configured");
   return {
-    id: readField<string>(item, "ID") ?? "",
-    projectId: readField<string>(item, "ProjectID"),
-    title: readField<string>(item, "Title") ?? "",
-    description: readField<string>(item, "Description"),
-    type: type === "user_story" ? "story" : (type as WorkItemType) ?? "task",
-    status: status === "to_do" ? "todo" : (status as WorkItemStatus) ?? "todo",
-    blocked: status === "blocked",
-    priority: priority === "critical" ? "highest" : (priority as Priority) ?? "medium",
-    storyPoints: readField<number>(item, "StoryPoints") ?? 0,
-    epic: "",
-    assigneeId: readField<string>(item, "AssigneeID"),
-    reporterId: readField<string>(item, "ReporterID"),
-    sprintId: null,
-    labels: [],
-    features: readField<Record<string, unknown>>(item, "Features"),
-    acceptanceCriteria: [],
-    createdAt: readField<string>(item, "CreatedAt") ?? new Date().toISOString(),
-    updatedAt: readField<string>(item, "UpdatedAt") ?? new Date().toISOString(),
+    ...(id ? { id } : {}),
+    project_id: projectId,
+    sprint_id: input.sprintId === undefined ? undefined : input.sprintId,
+    title: input.title,
+    description: input.description ?? "",
+    type: input.type === "story" ? "user_story" : input.type ?? "task",
+    status: input.status === "todo" ? "to_do" : input.status ?? "to_do",
+    priority: input.priority === "highest" ? "critical" : input.priority ?? "medium",
+    assignee_id: input.assigneeId ?? "",
+    reporter_id: input.reporterId ?? "",
+    story_points: input.storyPoints ?? 0,
+    features: input.features ?? {},
   };
-}
-
-function toRpcWorkItem(input: WorkItemInput, id?: string) {
-  return {
-    ...(id ? { ID: id } : {}),
-    ProjectID: input.projectId ?? DEFAULT_PROJECT_ID,
-    Title: input.title,
-    Description: input.description ?? "",
-    Type: input.type === "story" ? "user_story" : input.type ?? "task",
-    Status: input.status === "todo" ? "to_do" : input.status ?? "to_do",
-    Priority: input.priority === "highest" ? "critical" : input.priority ?? "medium",
-    AssigneeID: input.assigneeId ?? "",
-    ReporterID: input.reporterId ?? "",
-    StoryPoints: input.storyPoints ?? 0,
-    Features: input.features ?? {},
-  };
-}
-
-async function callWorkItemRpc(payload: Record<string, unknown>): Promise<RpcResponse> {
-  const Socket = globalThis.WebSocket;
-  if (!Socket) throw new Error("WebSocket is not available in this runtime");
-
-  return new Promise((resolve, reject) => {
-    const socket = new Socket(WORK_ITEMS_RPC_URL);
-    const timeout = setTimeout(() => {
-      socket.close();
-      reject(new Error("Work Item RPC timed out"));
-    }, RPC_TIMEOUT_MS);
-
-    const fail = (error: Error) => {
-      clearTimeout(timeout);
-      reject(error);
-    };
-
-    socket.onopen = () => socket.send(JSON.stringify(payload));
-    socket.onerror = () => fail(new Error("Work Item RPC connection failed"));
-    socket.onclose = () => clearTimeout(timeout);
-    socket.onmessage = (event) => {
-      try {
-        const response = JSON.parse(String(event.data)) as RpcResponse;
-        clearTimeout(timeout);
-        socket.close();
-        if (response.error || response.message) {
-          reject(new Error(response.error ?? response.message));
-          return;
-        }
-        resolve(response);
-      } catch {
-        fail(new Error("Invalid Work Item RPC response"));
-      }
-    };
-  });
 }
 
 export interface ListWorkItemsParams {
-  /** null = unplanned Backlog items only. Omit to get every Work Item. */
   sprintId?: string | null;
   projectId?: string;
 }
@@ -131,49 +96,58 @@ export interface ListWorkItemsParams {
 export async function listWorkItems(
   params: ListWorkItemsParams = {},
 ): Promise<WorkItem[]> {
-  const response = await callWorkItemRpc({
-    operation: "list",
-    project_id: params.projectId ?? DEFAULT_PROJECT_ID,
-  });
-  const items = response.work_items ?? (Array.isArray(response.data) ? response.data : []);
-  const workItems = items.map(toWorkItem);
-  return params.sprintId === undefined
-    ? workItems
-    : workItems.filter((item) => item.sprintId === params.sprintId);
+  const query = new URLSearchParams();
+  if (params.sprintId !== undefined) {
+    if (params.sprintId) {
+      query.set("sprint_id", params.sprintId);
+    } else {
+      const projectId = params.projectId ?? DEFAULT_PROJECT_ID;
+      if (!projectId) throw new Error("NEXT_PUBLIC_CHURA_PROJECT_ID is not configured");
+      query.set("project_id", projectId);
+    }
+  } else {
+    const projectId = params.projectId ?? DEFAULT_PROJECT_ID;
+    if (!projectId) throw new Error("NEXT_PUBLIC_CHURA_PROJECT_ID is not configured");
+    query.set("project_id", projectId);
+  }
+  const items = await apiRequest<ApiWorkItem[]>(
+    `/work-items?${query.toString()}`,
+  );
+  return items.map(toWorkItem).filter((item) =>
+    params.sprintId === null ? item.sprintId === null : true,
+  );
 }
 
 export async function getWorkItem(id: string): Promise<WorkItem | null> {
-  const response = await callWorkItemRpc({ operation: "get", id });
-  const item = response.work_item ?? (response.data && !Array.isArray(response.data) ? response.data : undefined);
-  return item ? toWorkItem(item) : null;
+  try {
+    return toWorkItem(await apiRequest<ApiWorkItem>(`/work-items/${id}`));
+  } catch (error) {
+    if (error instanceof Error && error.message === "not found") return null;
+    throw error;
+  }
 }
 
 export async function createWorkItem(input: CreateWorkItemInput): Promise<WorkItem> {
-  const response = await callWorkItemRpc({
-    operation: "create",
-    work_item: toRpcWorkItem(input),
-  });
-  const item = response.work_item ?? (response.data && !Array.isArray(response.data) ? response.data : undefined);
-  if (!item) throw new Error("Create Work Item response did not include a work item");
-  return toWorkItem(item);
+  return toWorkItem(await apiRequest<ApiWorkItem>("/work-items", {
+    method: "POST",
+    body: JSON.stringify(toPayload(input)),
+  }));
 }
 
 export async function updateWorkItem(input: UpdateWorkItemInput): Promise<WorkItem> {
-  const response = await callWorkItemRpc({
-    operation: "update",
-    work_item: toRpcWorkItem(input, input.id),
-  });
-  const item = response.work_item ?? (response.data && !Array.isArray(response.data) ? response.data : undefined);
-  if (!item) throw new Error("Update Work Item response did not include a work item");
-  return toWorkItem(item);
+  return toWorkItem(await apiRequest<ApiWorkItem>(`/work-items/${input.id}`, {
+    method: "PUT",
+    body: JSON.stringify(toPayload(input, input.id)),
+  }));
 }
 
 export async function deleteWorkItem(id: string): Promise<void> {
-  await callWorkItemRpc({ operation: "delete", id });
+  await apiRequest<void>(`/work-items/${id}`, { method: "DELETE" });
 }
 
 export async function listComments(
   workItemId: string,
 ): Promise<WorkItemComment[]> {
-  return comments.filter((comment) => comment.workItemId === workItemId);
+  void workItemId;
+  return [];
 }
