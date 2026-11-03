@@ -20,7 +20,8 @@ make dev     # backend + frontend together (Ctrl-C stops both)
 | What | Where |
 |---|---|
 | Frontend | http://localhost:3000 |
-| Backend API | http://localhost:8083 (gRPC on 9000) |
+| API gateway (Kong, `make up`) | http://localhost:8083 |
+| Backend split (`make backend-split`) | analytics :8056, sprint :8057, workitem :8058, project :8059 |
 | Keycloak admin | http://localhost:8080/admin — `admin` / `admin`, realm `chura` |
 | Test users | `tonnam`, `pim` (members), `jojo` (auditor) — password `test1234` |
 
@@ -33,16 +34,19 @@ make dev     # backend + frontend together (Ctrl-C stops both)
    Existing files are never overwritten; keys added to `.env.example` later are appended.
 4. **infra** — starts Keycloak, then Postgres and MongoDB, and waits until they are healthy.
 5. **migrate** — applies Postgres migrations with goose (in Docker).
-6. **frontend-deps** — `pnpm install --frozen-lockfile`.
-7. **verify-keycloak** — checks the local realm has the `chura-backend` service account.
+6. **seed-dev** — inserts the local dev project row (`scripts/seed-dev-postgres.sh`).
+7. **frontend-deps** — `pnpm install --frozen-lockfile`.
+8. **verify-keycloak** — checks the local realm has the `chura-backend` service account.
 
 ## Day-to-day targets
 
 | Target | Purpose |
 |---|---|
-| `make dev` | Run backend (`go run`) and frontend (`pnpm dev`) |
-| `make backend` / `make frontend` | Run only one side |
-| `make up` | Alternative: run Keycloak + the full backend stack in Docker |
+| `make seed-dev` | Seed local Postgres dev data (after `make migrate`) |
+| `make dev` | Run `backend-split` + frontend (`pnpm dev`) |
+| `make backend-split` | Four domain services on :8056–:8059 (no Kong) |
+| `make frontend` | Run only the frontend |
+| `make up` | Keycloak + Consul + four services + Kong gateway on :8083 |
 | `make down` | Stop all containers (data is kept) |
 | `make status` | Show container status |
 | `make logs` | Follow container logs |
@@ -56,12 +60,52 @@ Destructive targets ask you to type `yes` first:
 | `make reset-keycloak` | All local Keycloak data (users, groups, Project memberships), then re-imports the realm |
 | `make clean` | All local containers and volumes — Keycloak, Postgres, MongoDB |
 
+## API gateway with Kong and Consul (`make up`)
+
+`make up` runs four domain services (project, sprint, analytics, workitem) that
+register with Consul. Kong listens on :8083 (same URL the frontend already uses),
+resolves upstreams via Consul DNS (`*.service.consul`), and routes by path without
+a service prefix. `make backend-split` runs the same binaries locally on :8056–:8059
+without Kong.
+
+| What | Where |
+|---|---|
+| API through Kong | http://localhost:8083 |
+| Kong Admin API | http://localhost:8001 |
+| Konga dashboard (read-only) | http://localhost:1338 — `admin` / `admin1234` |
+
+On Windows, run `make` from Git Bash (`winget install ezwinports.make` if it is missing).
+
+**Config** lives in `deploy/kong/kong.yml` (Kong runs DB-less). Edit that file, then
+`docker compose -f deploy/docker-compose.yml restart kong`. Konga only displays it;
+creating or editing entities in Konga fails by design.
+
+**See it work.** Every API response carries `X-Instance` naming the service replica.
+Consul UI: http://localhost:8500 lists `chura-project`, `chura-sprint`, `chura-analytics`, and `chura-workitem`.
+
+1. Consul UI → **Services**: four `chura-*` entries with passing health checks.
+2. Unified paths through Kong:
+   ```bash
+   curl -s localhost:8083/health
+   ```
+3. Konga → **Services / Routes** mirrors `deploy/kong/kong.yml` (read-only; edit the file and restart Kong to change routing).
+
+Work item gRPC is in-process inside the workitem service; only HTTP/WebSocket is registered in Consul on :8058.
+
+**Hot-swappable nodes (Pattern A).** Each instance registers the same Consul service name with its **container IP** (not a hostname). Kong resolves `chura-project.service.consul` through Consul DNS (`KONG_DNS_RESOLVER` → Consul `:8600` in `deploy/kong/entrypoint.sh`). Scale without editing `kong.yml`:
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d --scale chura-project=2
+```
+
+New replicas appear in Consul; Kong picks them up on the next DNS refresh (`KONG_DNS_STALE_TTL`).
+
 ## Common issues
 
 ### A port is already in use
 
 `check-ports` prints `⚠️ port N is already in use by '<name>'`. Dev ports:
-8080 (Keycloak), 3000 (frontend), 27017 (MongoDB), 8083 / 9000 (API), and the
+8080 (Keycloak), 3000 (frontend), 27017 (MongoDB), 8083 (Kong gateway), 8056–8059 (split API), 8500 (Consul), and the
 Postgres port from `DATABASE_URL` in `backend/.env` (default 5432).
 
 - **Another Docker container** — stop it (`docker stop <name>`).

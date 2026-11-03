@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        v7.36.2
-// source: internal/adapter/grpc/proto/workitem.proto
+// source: internal/adapter/handler/grpc/proto/workitem.proto
 
 package workitem
 
@@ -60,11 +60,11 @@ func (x WorkItemType) String() string {
 }
 
 func (WorkItemType) Descriptor() protoreflect.EnumDescriptor {
-	return file_internal_adapter_grpc_proto_workitem_proto_enumTypes[0].Descriptor()
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_enumTypes[0].Descriptor()
 }
 
 func (WorkItemType) Type() protoreflect.EnumType {
-	return &file_internal_adapter_grpc_proto_workitem_proto_enumTypes[0]
+	return &file_internal_adapter_handler_grpc_proto_workitem_proto_enumTypes[0]
 }
 
 func (x WorkItemType) Number() protoreflect.EnumNumber {
@@ -73,7 +73,7 @@ func (x WorkItemType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WorkItemType.Descriptor instead.
 func (WorkItemType) EnumDescriptor() ([]byte, []int) {
-	return file_internal_adapter_grpc_proto_workitem_proto_rawDescGZIP(), []int{0}
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescGZIP(), []int{0}
 }
 
 type WorkItemStatus int32
@@ -118,11 +118,11 @@ func (x WorkItemStatus) String() string {
 }
 
 func (WorkItemStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_internal_adapter_grpc_proto_workitem_proto_enumTypes[1].Descriptor()
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_enumTypes[1].Descriptor()
 }
 
 func (WorkItemStatus) Type() protoreflect.EnumType {
-	return &file_internal_adapter_grpc_proto_workitem_proto_enumTypes[1]
+	return &file_internal_adapter_handler_grpc_proto_workitem_proto_enumTypes[1]
 }
 
 func (x WorkItemStatus) Number() protoreflect.EnumNumber {
@@ -131,7 +131,7 @@ func (x WorkItemStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WorkItemStatus.Descriptor instead.
 func (WorkItemStatus) EnumDescriptor() ([]byte, []int) {
-	return file_internal_adapter_grpc_proto_workitem_proto_rawDescGZIP(), []int{1}
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescGZIP(), []int{1}
 }
 
 type WorkItemPriority int32
@@ -173,11 +173,11 @@ func (x WorkItemPriority) String() string {
 }
 
 func (WorkItemPriority) Descriptor() protoreflect.EnumDescriptor {
-	return file_internal_adapter_grpc_proto_workitem_proto_enumTypes[2].Descriptor()
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_enumTypes[2].Descriptor()
 }
 
 func (WorkItemPriority) Type() protoreflect.EnumType {
-	return &file_internal_adapter_grpc_proto_workitem_proto_enumTypes[2]
+	return &file_internal_adapter_handler_grpc_proto_workitem_proto_enumTypes[2]
 }
 
 func (x WorkItemPriority) Number() protoreflect.EnumNumber {
@@ -186,7 +186,7 @@ func (x WorkItemPriority) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WorkItemPriority.Descriptor instead.
 func (WorkItemPriority) EnumDescriptor() ([]byte, []int) {
-	return file_internal_adapter_grpc_proto_workitem_proto_rawDescGZIP(), []int{2}
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescGZIP(), []int{2}
 }
 
 type WorkItem struct {
@@ -204,13 +204,14 @@ type WorkItem struct {
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	Features      *structpb.Struct       `protobuf:"bytes,13,opt,name=features,proto3" json:"features,omitempty"`
+	SprintId      string                 `protobuf:"bytes,14,opt,name=sprint_id,json=sprintId,proto3" json:"sprint_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *WorkItem) Reset() {
 	*x = WorkItem{}
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[0]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -222,7 +223,7 @@ func (x *WorkItem) String() string {
 func (*WorkItem) ProtoMessage() {}
 
 func (x *WorkItem) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[0]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -235,7 +236,7 @@ func (x *WorkItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkItem.ProtoReflect.Descriptor instead.
 func (*WorkItem) Descriptor() ([]byte, []int) {
-	return file_internal_adapter_grpc_proto_workitem_proto_rawDescGZIP(), []int{0}
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *WorkItem) GetId() string {
@@ -329,6 +330,13 @@ func (x *WorkItem) GetFeatures() *structpb.Struct {
 	return nil
 }
 
+func (x *WorkItem) GetSprintId() string {
+	if x != nil {
+		return x.SprintId
+	}
+	return ""
+}
+
 type CreateWorkItemRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkItem      *WorkItemInput         `protobuf:"bytes,1,opt,name=work_item,json=workItem,proto3" json:"work_item,omitempty"`
@@ -338,7 +346,7 @@ type CreateWorkItemRequest struct {
 
 func (x *CreateWorkItemRequest) Reset() {
 	*x = CreateWorkItemRequest{}
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[1]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -350,7 +358,7 @@ func (x *CreateWorkItemRequest) String() string {
 func (*CreateWorkItemRequest) ProtoMessage() {}
 
 func (x *CreateWorkItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[1]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -363,7 +371,7 @@ func (x *CreateWorkItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateWorkItemRequest.ProtoReflect.Descriptor instead.
 func (*CreateWorkItemRequest) Descriptor() ([]byte, []int) {
-	return file_internal_adapter_grpc_proto_workitem_proto_rawDescGZIP(), []int{1}
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *CreateWorkItemRequest) GetWorkItem() *WorkItemInput {
@@ -383,7 +391,7 @@ type UpdateWorkItemRequest struct {
 
 func (x *UpdateWorkItemRequest) Reset() {
 	*x = UpdateWorkItemRequest{}
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[2]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -395,7 +403,7 @@ func (x *UpdateWorkItemRequest) String() string {
 func (*UpdateWorkItemRequest) ProtoMessage() {}
 
 func (x *UpdateWorkItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[2]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -408,7 +416,7 @@ func (x *UpdateWorkItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateWorkItemRequest.ProtoReflect.Descriptor instead.
 func (*UpdateWorkItemRequest) Descriptor() ([]byte, []int) {
-	return file_internal_adapter_grpc_proto_workitem_proto_rawDescGZIP(), []int{2}
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *UpdateWorkItemRequest) GetId() string {
@@ -437,13 +445,14 @@ type WorkItemInput struct {
 	ReporterId    string                 `protobuf:"bytes,8,opt,name=reporter_id,json=reporterId,proto3" json:"reporter_id,omitempty"`
 	StoryPoints   int32                  `protobuf:"varint,9,opt,name=story_points,json=storyPoints,proto3" json:"story_points,omitempty"`
 	Features      *structpb.Struct       `protobuf:"bytes,10,opt,name=features,proto3" json:"features,omitempty"`
+	SprintId      string                 `protobuf:"bytes,11,opt,name=sprint_id,json=sprintId,proto3" json:"sprint_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *WorkItemInput) Reset() {
 	*x = WorkItemInput{}
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[3]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -455,7 +464,7 @@ func (x *WorkItemInput) String() string {
 func (*WorkItemInput) ProtoMessage() {}
 
 func (x *WorkItemInput) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[3]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -468,7 +477,7 @@ func (x *WorkItemInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkItemInput.ProtoReflect.Descriptor instead.
 func (*WorkItemInput) Descriptor() ([]byte, []int) {
-	return file_internal_adapter_grpc_proto_workitem_proto_rawDescGZIP(), []int{3}
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *WorkItemInput) GetProjectId() string {
@@ -541,6 +550,13 @@ func (x *WorkItemInput) GetFeatures() *structpb.Struct {
 	return nil
 }
 
+func (x *WorkItemInput) GetSprintId() string {
+	if x != nil {
+		return x.SprintId
+	}
+	return ""
+}
+
 type GetWorkItemRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -550,7 +566,7 @@ type GetWorkItemRequest struct {
 
 func (x *GetWorkItemRequest) Reset() {
 	*x = GetWorkItemRequest{}
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[4]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -562,7 +578,7 @@ func (x *GetWorkItemRequest) String() string {
 func (*GetWorkItemRequest) ProtoMessage() {}
 
 func (x *GetWorkItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[4]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -575,7 +591,7 @@ func (x *GetWorkItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkItemRequest.ProtoReflect.Descriptor instead.
 func (*GetWorkItemRequest) Descriptor() ([]byte, []int) {
-	return file_internal_adapter_grpc_proto_workitem_proto_rawDescGZIP(), []int{4}
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetWorkItemRequest) GetId() string {
@@ -594,7 +610,7 @@ type ListWorkItemsRequest struct {
 
 func (x *ListWorkItemsRequest) Reset() {
 	*x = ListWorkItemsRequest{}
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[5]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -606,7 +622,7 @@ func (x *ListWorkItemsRequest) String() string {
 func (*ListWorkItemsRequest) ProtoMessage() {}
 
 func (x *ListWorkItemsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[5]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -619,7 +635,7 @@ func (x *ListWorkItemsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkItemsRequest.ProtoReflect.Descriptor instead.
 func (*ListWorkItemsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_adapter_grpc_proto_workitem_proto_rawDescGZIP(), []int{5}
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ListWorkItemsRequest) GetProjectId() string {
@@ -638,7 +654,7 @@ type ListWorkItemsResponse struct {
 
 func (x *ListWorkItemsResponse) Reset() {
 	*x = ListWorkItemsResponse{}
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[6]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -650,7 +666,7 @@ func (x *ListWorkItemsResponse) String() string {
 func (*ListWorkItemsResponse) ProtoMessage() {}
 
 func (x *ListWorkItemsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[6]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -663,7 +679,7 @@ func (x *ListWorkItemsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkItemsResponse.ProtoReflect.Descriptor instead.
 func (*ListWorkItemsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_adapter_grpc_proto_workitem_proto_rawDescGZIP(), []int{6}
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListWorkItemsResponse) GetWorkItems() []*WorkItem {
@@ -682,7 +698,7 @@ type DeleteWorkItemRequest struct {
 
 func (x *DeleteWorkItemRequest) Reset() {
 	*x = DeleteWorkItemRequest{}
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[7]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -694,7 +710,7 @@ func (x *DeleteWorkItemRequest) String() string {
 func (*DeleteWorkItemRequest) ProtoMessage() {}
 
 func (x *DeleteWorkItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_adapter_grpc_proto_workitem_proto_msgTypes[7]
+	mi := &file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -707,7 +723,7 @@ func (x *DeleteWorkItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteWorkItemRequest.ProtoReflect.Descriptor instead.
 func (*DeleteWorkItemRequest) Descriptor() ([]byte, []int) {
-	return file_internal_adapter_grpc_proto_workitem_proto_rawDescGZIP(), []int{7}
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DeleteWorkItemRequest) GetId() string {
@@ -717,11 +733,11 @@ func (x *DeleteWorkItemRequest) GetId() string {
 	return ""
 }
 
-var File_internal_adapter_grpc_proto_workitem_proto protoreflect.FileDescriptor
+var File_internal_adapter_handler_grpc_proto_workitem_proto protoreflect.FileDescriptor
 
-const file_internal_adapter_grpc_proto_workitem_proto_rawDesc = "" +
+const file_internal_adapter_handler_grpc_proto_workitem_proto_rawDesc = "" +
 	"\n" +
-	"*internal/adapter/grpc/proto/workitem.proto\x12\x11chura.workitem.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb2\x04\n" +
+	"2internal/adapter/handler/grpc/proto/workitem.proto\x12\x11chura.workitem.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcf\x04\n" +
 	"\bWorkItem\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -741,12 +757,13 @@ const file_internal_adapter_grpc_proto_workitem_proto_rawDesc = "" +
 	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x123\n" +
-	"\bfeatures\x18\r \x01(\v2\x17.google.protobuf.StructR\bfeatures\"V\n" +
+	"\bfeatures\x18\r \x01(\v2\x17.google.protobuf.StructR\bfeatures\x12\x1b\n" +
+	"\tsprint_id\x18\x0e \x01(\tR\bsprintId\"V\n" +
 	"\x15CreateWorkItemRequest\x12=\n" +
 	"\twork_item\x18\x01 \x01(\v2 .chura.workitem.v1.WorkItemInputR\bworkItem\"f\n" +
 	"\x15UpdateWorkItemRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12=\n" +
-	"\twork_item\x18\x02 \x01(\v2 .chura.workitem.v1.WorkItemInputR\bworkItem\"\xb1\x03\n" +
+	"\twork_item\x18\x02 \x01(\v2 .chura.workitem.v1.WorkItemInputR\bworkItem\"\xce\x03\n" +
 	"\rWorkItemInput\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x14\n" +
@@ -761,7 +778,8 @@ const file_internal_adapter_grpc_proto_workitem_proto_rawDesc = "" +
 	"reporterId\x12!\n" +
 	"\fstory_points\x18\t \x01(\x05R\vstoryPoints\x123\n" +
 	"\bfeatures\x18\n" +
-	" \x01(\v2\x17.google.protobuf.StructR\bfeatures\"$\n" +
+	" \x01(\v2\x17.google.protobuf.StructR\bfeatures\x12\x1b\n" +
+	"\tsprint_id\x18\v \x01(\tR\bsprintId\"$\n" +
 	"\x12GetWorkItemRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"5\n" +
 	"\x14ListWorkItemsRequest\x12\x1d\n" +
@@ -798,23 +816,23 @@ const file_internal_adapter_grpc_proto_workitem_proto_rawDesc = "" +
 	"\vGetWorkItem\x12%.chura.workitem.v1.GetWorkItemRequest\x1a\x1b.chura.workitem.v1.WorkItem\x12b\n" +
 	"\rListWorkItems\x12'.chura.workitem.v1.ListWorkItemsRequest\x1a(.chura.workitem.v1.ListWorkItemsResponse\x12W\n" +
 	"\x0eUpdateWorkItem\x12(.chura.workitem.v1.UpdateWorkItemRequest\x1a\x1b.chura.workitem.v1.WorkItem\x12R\n" +
-	"\x0eDeleteWorkItem\x12(.chura.workitem.v1.DeleteWorkItemRequest\x1a\x16.google.protobuf.EmptyBPZNgithub.com/RookieJoel/Chura/backend/internal/adapter/grpc/pb/workitem;workitemb\x06proto3"
+	"\x0eDeleteWorkItem\x12(.chura.workitem.v1.DeleteWorkItemRequest\x1a\x16.google.protobuf.EmptyBXZVgithub.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc/pb/workitem;workitemb\x06proto3"
 
 var (
-	file_internal_adapter_grpc_proto_workitem_proto_rawDescOnce sync.Once
-	file_internal_adapter_grpc_proto_workitem_proto_rawDescData []byte
+	file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescOnce sync.Once
+	file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescData []byte
 )
 
-func file_internal_adapter_grpc_proto_workitem_proto_rawDescGZIP() []byte {
-	file_internal_adapter_grpc_proto_workitem_proto_rawDescOnce.Do(func() {
-		file_internal_adapter_grpc_proto_workitem_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_adapter_grpc_proto_workitem_proto_rawDesc), len(file_internal_adapter_grpc_proto_workitem_proto_rawDesc)))
+func file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescGZIP() []byte {
+	file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescOnce.Do(func() {
+		file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_adapter_handler_grpc_proto_workitem_proto_rawDesc), len(file_internal_adapter_handler_grpc_proto_workitem_proto_rawDesc)))
 	})
-	return file_internal_adapter_grpc_proto_workitem_proto_rawDescData
+	return file_internal_adapter_handler_grpc_proto_workitem_proto_rawDescData
 }
 
-var file_internal_adapter_grpc_proto_workitem_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_internal_adapter_grpc_proto_workitem_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
-var file_internal_adapter_grpc_proto_workitem_proto_goTypes = []any{
+var file_internal_adapter_handler_grpc_proto_workitem_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_internal_adapter_handler_grpc_proto_workitem_proto_goTypes = []any{
 	(WorkItemType)(0),             // 0: chura.workitem.v1.WorkItemType
 	(WorkItemStatus)(0),           // 1: chura.workitem.v1.WorkItemStatus
 	(WorkItemPriority)(0),         // 2: chura.workitem.v1.WorkItemPriority
@@ -830,7 +848,7 @@ var file_internal_adapter_grpc_proto_workitem_proto_goTypes = []any{
 	(*structpb.Struct)(nil),       // 12: google.protobuf.Struct
 	(*emptypb.Empty)(nil),         // 13: google.protobuf.Empty
 }
-var file_internal_adapter_grpc_proto_workitem_proto_depIdxs = []int32{
+var file_internal_adapter_handler_grpc_proto_workitem_proto_depIdxs = []int32{
 	0,  // 0: chura.workitem.v1.WorkItem.type:type_name -> chura.workitem.v1.WorkItemType
 	1,  // 1: chura.workitem.v1.WorkItem.status:type_name -> chura.workitem.v1.WorkItemStatus
 	2,  // 2: chura.workitem.v1.WorkItem.priority:type_name -> chura.workitem.v1.WorkItemPriority
@@ -861,27 +879,27 @@ var file_internal_adapter_grpc_proto_workitem_proto_depIdxs = []int32{
 	0,  // [0:13] is the sub-list for field type_name
 }
 
-func init() { file_internal_adapter_grpc_proto_workitem_proto_init() }
-func file_internal_adapter_grpc_proto_workitem_proto_init() {
-	if File_internal_adapter_grpc_proto_workitem_proto != nil {
+func init() { file_internal_adapter_handler_grpc_proto_workitem_proto_init() }
+func file_internal_adapter_handler_grpc_proto_workitem_proto_init() {
+	if File_internal_adapter_handler_grpc_proto_workitem_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_adapter_grpc_proto_workitem_proto_rawDesc), len(file_internal_adapter_grpc_proto_workitem_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_adapter_handler_grpc_proto_workitem_proto_rawDesc), len(file_internal_adapter_handler_grpc_proto_workitem_proto_rawDesc)),
 			NumEnums:      3,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_adapter_grpc_proto_workitem_proto_goTypes,
-		DependencyIndexes: file_internal_adapter_grpc_proto_workitem_proto_depIdxs,
-		EnumInfos:         file_internal_adapter_grpc_proto_workitem_proto_enumTypes,
-		MessageInfos:      file_internal_adapter_grpc_proto_workitem_proto_msgTypes,
+		GoTypes:           file_internal_adapter_handler_grpc_proto_workitem_proto_goTypes,
+		DependencyIndexes: file_internal_adapter_handler_grpc_proto_workitem_proto_depIdxs,
+		EnumInfos:         file_internal_adapter_handler_grpc_proto_workitem_proto_enumTypes,
+		MessageInfos:      file_internal_adapter_handler_grpc_proto_workitem_proto_msgTypes,
 	}.Build()
-	File_internal_adapter_grpc_proto_workitem_proto = out.File
-	file_internal_adapter_grpc_proto_workitem_proto_goTypes = nil
-	file_internal_adapter_grpc_proto_workitem_proto_depIdxs = nil
+	File_internal_adapter_handler_grpc_proto_workitem_proto = out.File
+	file_internal_adapter_handler_grpc_proto_workitem_proto_goTypes = nil
+	file_internal_adapter_handler_grpc_proto_workitem_proto_depIdxs = nil
 }

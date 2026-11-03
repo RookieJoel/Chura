@@ -10,6 +10,9 @@ import (
 	"github.com/RookieJoel/Chura/backend/internal/domain"
 )
 
+// testInstanceName is the replica name test routers put in X-Instance.
+const testInstanceName = "api-test"
+
 // testActorMiddleware is TEST-ONLY. It stands in for the Keycloak JWT
 // middleware: it builds the Actor from X-Test-Actor-* headers and answers 401
 // when no valid actor is supplied. Production never reads these headers.
@@ -33,5 +36,5 @@ func newTestRouter(sprints *handler.SprintHandler, templates *handler.TemplateHa
 }
 
 func newTestRouterWithAnalytics(sprints *handler.SprintHandler, templates *handler.TemplateHandler, projects *handler.ProjectHandler, analytics *handler.AnalyticsHandler) *fiber.App {
-	return handler.NewRouter(sprints, handler.NewAuthHandler(), templates, projects, analytics, "http://localhost:3000", testActorMiddleware)
+	return handler.NewRouter(sprints, handler.NewAuthHandler(), templates, projects, analytics, "http://localhost:3000", testInstanceName, testActorMiddleware)
 }

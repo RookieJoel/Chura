@@ -1,6 +1,8 @@
 package http
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -90,8 +92,49 @@ func (h *AnalyticsHandler) ExportReviewSummary(c *fiber.Ctx) error {
 	if err != nil {
 		return writeError(c, err)
 	}
-	// Attachment guesses a Content-Type from the extension; set ours after it.
-	c.Attachment(report.Filename)
+	// The body is a generated CSV/Markdown file, never HTML: refuse anything
+	// else, force download and forbid MIME sniffing so a browser can't render
+	// it as a page.
+	if !isDownloadContentType(report.ContentType) {
+		return writeError(c, fmt.Errorf("export: unexpected content type %q", report.ContentType))
+	}
+	c.Set(fiber.HeaderContentDisposition, `attachment; filename="`+sanitizeFilename(report.Filename)+`"`)
 	c.Set(fiber.HeaderContentType, report.ContentType)
+	c.Set(fiber.HeaderXContentTypeOptions, "nosniff")
 	return c.Send(report.Data)
+}
+
+// downloadContentTypes are the only types an export may be served as.
+var downloadContentTypes = []string{"text/csv", "text/markdown"}
+
+func isDownloadContentType(contentType string) bool {
+	mediaType, _, _ := strings.Cut(contentType, ";")
+	return slices.Contains(downloadContentTypes, strings.ToLower(strings.TrimSpace(mediaType)))
+}
+
+// sanitizeFilename reduces name to a safe download name: no path components,
+// only [A-Za-z0-9._-], no leading dot or dash. Falls back to "report".
+func sanitizeFilename(name string) string {
+	if i := strings.LastIndexAny(name, `/\`); i >= 0 {
+		name = name[i+1:]
+	}
+	var b strings.Builder
+	pendingDash := false
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '.', r == '_', r == '-':
+			if pendingDash && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			pendingDash = false
+			b.WriteRune(r)
+		default:
+			pendingDash = true
+		}
+	}
+	out := strings.TrimLeft(b.String(), ".-")
+	if out == "" {
+		return "report"
+	}
+	return out
 }

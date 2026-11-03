@@ -4,7 +4,10 @@
 export DATABASE_URL
 
 build:
-	go build -o bin/api ./cmd/api
+	go build -o bin/project ./cmd/project
+	go build -o bin/sprint ./cmd/sprint
+	go build -o bin/analytics ./cmd/analytics
+	go build -o bin/workitem ./cmd/workitem
 
 lint:
 	go vet ./...

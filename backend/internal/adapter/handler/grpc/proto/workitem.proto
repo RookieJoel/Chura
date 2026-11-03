@@ -30,6 +30,7 @@ message WorkItem {
   google.protobuf.Timestamp created_at = 11;
   google.protobuf.Timestamp updated_at = 12;
   google.protobuf.Struct features = 13;
+  string sprint_id = 14;
 }
 
 enum WorkItemType { WORK_ITEM_TYPE_UNSPECIFIED = 0; TASK = 1; USER_STORY = 2; BUG = 3; }
@@ -49,6 +50,7 @@ message WorkItemInput {
   string reporter_id = 8;
   int32 story_points = 9;
   google.protobuf.Struct features = 10;
+  string sprint_id = 11;
 }
 message GetWorkItemRequest { string id = 1; }
 message ListWorkItemsRequest { string project_id = 1; }

@@ -1,0 +1,147 @@
+name: Security
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SEVERITY_THRESHOLD: high
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so leaked-then-removed secrets are found
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sast:
+    name: SAST (Snyk Code)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SNYK_TOKEN
+        run: test -n "$SNYK_TOKEN" || { echo "::error::SNYK_TOKEN secret is not set"; exit 1; }
+      - uses: snyk/actions/setup@master
+      - name: Snyk Code test
+        run: >
+          snyk code test
+          --severity-threshold=$SEVERITY_THRESHOLD
+          --sarif-file-output=snyk-code.sarif
+      - name: Upload SARIF
+        if: always() && hashFiles('snyk-code.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-code.sarif
+          category: snyk-code
+
+  sca:
+    name: Dependencies (Snyk Open Source)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SNYK_TOKEN
+        run: test -n "$SNYK_TOKEN" || { echo "::error::SNYK_TOKEN secret is not set"; exit 1; }
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: snyk/actions/setup@master
+      - name: Snyk test (Go + pnpm lockfiles)
+        run: >
+          snyk test
+          --all-projects
+          --exclude=node_modules,.next
+          --severity-threshold=$SEVERITY_THRESHOLD
+          --sarif-file-output=snyk-oss.sarif
+      - name: Upload SARIF
+        if: always() && hashFiles('snyk-oss.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-oss.sarif
+          category: snyk-oss
+
+  image-scan:
+    name: Image scan (Trivy) - ${{ matrix.image.name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: backend
+            context: backend
+            dockerfile: backend/Dockerfile
+          - name: goose
+            context: deploy/images
+            dockerfile: deploy/images/goose.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          load: true
+          push: false
+          tags: chura-${{ matrix.image.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
+      # SARIF report first (never fails the step), then a gating table scan.
+      - name: Trivy report (SARIF)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: chura-${{ matrix.image.name }}:ci
+          format: sarif
+          output: trivy-${{ matrix.image.name }}.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "0"
+      - name: Upload SARIF
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.image.name)) != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.image.name }}.sarif
+          category: trivy-${{ matrix.image.name }}
+      - name: Trivy gate (fail on CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: chura-${{ matrix.image.name }}:ci
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          vuln-type: os,library
+          scanners: vuln,secret
+          exit-code: "1"
