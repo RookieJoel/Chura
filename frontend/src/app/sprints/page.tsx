@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { createSprint, deleteSprint, listSprints, updateSprint } from "@/api/sprints";
 import { AppShell } from "@/components/layout/app-shell";
 import { SprintActions } from "@/components/board/sprint-actions";
+import { Modal } from "@/components/modal";
 import type { Sprint } from "@/types/work-item";
 
 function formatDate(value: string) {
@@ -224,11 +225,8 @@ export default function SprintsPage() {
           </div>
         )}
         {showCreateForm && (
-          <form
-            onSubmit={handleCreate}
-            className="mb-5 rounded-lg border border-border bg-surface p-5 shadow-sm"
-          >
-            <h2 className="m-0 mb-4 text-sm font-bold">Create sprint</h2>
+          <Modal title="Create sprint" onClose={() => setShowCreateForm(false)}>
+            <form onSubmit={handleCreate} className="p-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex flex-col gap-1 text-xs font-semibold text-text-secondary">
                 Name *
@@ -278,7 +276,8 @@ export default function SprintsPage() {
                 {creating ? "Creating..." : "Create sprint"}
               </button>
             </div>
-          </form>
+            </form>
+          </Modal>
         )}
       </div>
     </AppShell>

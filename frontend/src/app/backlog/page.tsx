@@ -5,6 +5,7 @@ import { createWorkItem, listWorkItems, updateWorkItem } from "@/api/work-items"
 import { listMembers } from "@/api/members";
 import { listSprints } from "@/api/sprints";
 import { AppShell } from "@/components/layout/app-shell";
+import { Modal } from "@/components/modal";
 import { WorkItemRow } from "@/components/work-items/work-item-row";
 import { ChevronDownIcon } from "@/components/icons";
 import * as React from "react";
@@ -88,7 +89,7 @@ function CreateWorkItemForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border-b border-border bg-background px-4 py-4">
+    <form onSubmit={handleSubmit} className="bg-background px-5 py-5">
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-xs font-semibold text-text-secondary sm:col-span-2">
           Title *
@@ -288,24 +289,6 @@ export default function BacklogPage() {
                     </button>
                   }
                 />
-                {isCreating && (
-                  <CreateWorkItemForm
-                    sprints={sprints}
-                    initialSprintId={section.id}
-                    onCancel={() => setOpenCreateFor(null)}
-                    onError={(message) => setListError(message || undefined)}
-                    onCreated={(item) => {
-                      setWorkItems((current) => [item, ...current]);
-                      setOpenCreateFor(null);
-                      setListError(undefined);
-                    }}
-                  />
-                )}
-                {listError && isCreating && (
-                  <p className="m-0 border-b border-border px-3.5 py-3 text-[13px] text-red-600">
-                    {listError}
-                  </p>
-                )}
                 {sectionItems.length === 0 && !isCreating ? (
                   <p className="m-0 px-4 py-5 text-sm text-text-tertiary">
                     No work items in this section.
@@ -328,6 +311,29 @@ export default function BacklogPage() {
           })}
         </div>
       </div>
+      {openCreateFor !== null && (
+        <Modal
+          title="Create work item"
+          onClose={() => setOpenCreateFor(null)}
+        >
+          <CreateWorkItemForm
+            sprints={sprints}
+            initialSprintId={openCreateFor}
+            onCancel={() => setOpenCreateFor(null)}
+            onError={(message) => setListError(message || undefined)}
+            onCreated={(item) => {
+              setWorkItems((current) => [item, ...current]);
+              setOpenCreateFor(null);
+              setListError(undefined);
+            }}
+          />
+          {listError && (
+            <p className="m-0 border-t border-border px-5 py-3 text-[13px] text-red-600">
+              {listError}
+            </p>
+          )}
+        </Modal>
+      )}
     </AppShell>
   );
 }
