@@ -1,0 +1,47 @@
+@startuml 14-retrieve-sprint-data
+!include _style.puml
+title retrieveSprintData() - GET /api/v1/sprints/:id and GET /api/v1/sprints?project_id=
+
+actor "Team Member / Auditor" as C
+participant "KeycloakAuth\nmiddleware" as MW
+participant "SprintHandler" as SH
+participant "SprintService" as SS
+participant "ProjectConfigurationService\n(ProjectGateway)" as PCS
+database "PostgreSQL\n(sprints)" as PG
+
+== Get one sprint ==
+C -> MW : GET /api/v1/sprints/:id
+MW -> SH : Get
+SH -> SS : GetSprint(ctx, actor, id)
+activate SS
+group loadVisible
+  SS -> SS : actor.Validate()
+  SS -> PG : GetByID(id)
+  note right of PG : sprint id เป็นตัวเลข\nid ที่ไม่ใช่ตัวเลข = ErrNotFound (404) ไม่ใช่ 400
+  alt not found
+    PG --> SS : ErrNotFound
+    SS --> SH : ErrNotFound
+    SH --> C : 404 not found
+  end
+  PG --> SS : *Sprint
+  SS -> PCS : RetrieveProjectData(ctx, actor, sprint.ProjectID)
+  PCS --> SS : *Project / ErrNotProjectMember
+end
+SS --> SH : *Sprint / error
+deactivate SS
+SH --> C : 200 Sprint / 403
+
+== List sprints of a project ==
+C -> MW : GET /api/v1/sprints?project_id=...
+MW -> SH : List
+SH -> SS : ListSprints(ctx, actor, projectID)
+activate SS
+SS -> SS : actor.Validate() + parseProjectID()
+SS -> PCS : RetrieveProjectData(ctx, actor, projectID)
+PCS --> SS : *Project / error
+SS -> PG : repository.List(projectID)
+PG --> SS : []Sprint
+SS --> SH : []Sprint
+deactivate SS
+SH --> C : 200 [Sprint...]
+@enduml

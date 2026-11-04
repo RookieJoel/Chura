@@ -1,0 +1,69 @@
+@startuml 05-add-project-member
+!include _style.puml
+title addProjectMember() - POST /api/v1/projects/:id/members
+
+actor "Team Member" as C
+participant "KeycloakAuth\nmiddleware" as MW
+participant "ProjectHandler" as PH
+participant "ProjectConfigurationService" as PCS
+database "PostgreSQL\n(projects)" as PG
+participant "Keycloak Directory\n(Admin API)" as KC
+
+C -> MW : POST /api/v1/projects/:id/members\n{email}
+MW -> MW : verify JWT -> Actor
+MW -> PH : AddMember
+PH -> PCS : AddProjectMember(ctx, actor, projectID, email)
+activate PCS
+
+group loadMutable
+  PCS -> PG : GetByID(projectID)
+  PG --> PCS : Project
+  PCS -> KC : ListMembers(groupID)
+  KC --> PCS : []Member
+  PCS -> PCS : actor must be a member\n+ RequireTeamMember()
+end
+alt not visible / not Team Member
+  PCS --> PH : ErrNotFound / ErrNotProjectMember / ErrForbidden
+  PH --> C : 404 / 403
+end
+
+PCS -> PCS : validate email (non-empty, contains @, max length)
+PCS -> PCS : templateOf(project)
+PCS -> KC : FindUserByEmail(email)
+KC --> PCS : DirectoryUser{ID, Role}
+alt user not found
+  PCS --> PH : ErrNotFound
+  PH --> C : 404 not found
+else user.Role != Team Member
+  PCS --> PH : InvalidInputError
+  PH --> C : 400 invalid input
+end
+
+PCS -> PG : WithMembershipLock(projectID, fn)
+activate PG
+PG -> PG : in-process lockstripe +\nSELECT pg_advisory_xact_lock(...)
+PG -> PCS : fn(ctx)
+PCS -> KC : ListMembers(groupID) (refreshMembers)
+KC --> PCS : []Member
+alt user already a member
+  PCS --> PG : ErrAlreadyMember
+  PG --> PCS : error
+  PCS --> PH : ErrAlreadyMember
+  PH --> C : 409 user is already a member of this project
+else
+  PCS -> KC : AddMember(groupID, projectID, userID, template.DefaultRole)
+  KC --> PCS : ok
+  PCS --> PG : nil (commit, release lock)
+end
+deactivate PG
+
+PCS -> PCS : loadVisible(projectID) (reload with new member)
+PCS --> PH : *Project
+deactivate PCS
+PH --> C : 201 Project
+
+note over KC
+  ทุก call ไป Keycloak ที่ล้มเหลว (ยกเว้น 404)
+  จะกลายเป็น ErrUnavailable -> 503
+end note
+@enduml

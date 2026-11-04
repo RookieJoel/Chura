@@ -1,0 +1,67 @@
+@startuml 03-create-project-board
+!include _style.puml
+title createProjectBoard() - POST /api/v1/projects
+
+actor "Team Member" as C
+participant "KeycloakAuth\nmiddleware" as MW
+participant "ProjectHandler" as PH
+participant "ProjectConfigurationService" as PCS
+participant "Keycloak Directory\n(Admin API)" as KC
+database "PostgreSQL\n(projects)" as PG
+
+C -> MW : POST /api/v1/projects\n{name, description, template_id}
+MW -> MW : verify JWT -> Actor
+MW -> PH : Create
+activate PH
+PH -> PH : BodyParser
+alt invalid JSON
+  PH --> C : 400 invalid JSON body
+end
+PH -> PCS : CreateProjectBoard(ctx, actor, input)
+activate PCS
+PCS -> PCS : actor.RequireTeamMember()
+alt actor is Auditor
+  PCS --> PH : ErrForbidden
+  PH --> C : 403 forbidden
+end
+PCS -> PCS : domain.ValidateProjectInput(name, description, templateID)
+alt validation failed
+  PCS --> PH : InvalidInputError{violations}
+  PH --> C : 400 invalid input + violations
+end
+PCS -> PCS : build Project{ID = uuid, Mode = template.Mode, ...}
+
+PCS -> KC : CreateProjectGroup(projectID)
+alt Keycloak error
+  KC --> PCS : ErrUnavailable
+  PCS --> PH : ErrUnavailable
+  PH --> C : 503 service unavailable
+end
+KC --> PCS : groupID
+PCS -> KC : AddMember(groupID, projectID, creator, template.CreatorRole)
+alt AddMember failed
+  KC --> PCS : ErrUnavailable / ErrNotFound
+  PCS -> PCS : undoCreate()
+  PCS -> KC : RemoveMember + DeleteProjectGroup (best effort, errors only logged)
+  PCS --> PH : error
+  PH --> C : 503 / 404
+end
+PCS -> PG : repo.Create(project)
+alt insert failed
+  PCS -> PCS : undoCreate()
+  PCS -> KC : RemoveMember + DeleteProjectGroup (best effort, errors only logged)
+  PCS --> PH : ErrConflict (unique violation) / DB error
+  PH --> C : 409 / 500
+end
+PG --> PCS : ok
+PCS -> PCS : project.Members = [creator]
+PCS --> PH : *Project
+deactivate PCS
+PH --> C : 201 Project
+deactivate PH
+
+note over PCS, KC
+  Keycloak ไม่มี transaction: เขียนตามลำดับ
+  และถ้าล้มเหลวจะ undo ย้อนกลับ (compensation)
+end note
+@enduml

@@ -1,0 +1,69 @@
+@startuml 01-login-and-authenticated-request
+!include _style.puml
+title Login (NextAuth + Keycloak) and an authenticated API call (GET /api/v1/whoami)
+
+actor "User" as User
+box "Frontend (Next.js)" #EEF4FF
+  participant "proxy.ts\n(route guard)" as Proxy
+  participant "NextAuth\n(auth.ts)" as NA
+  participant "/api/whoami\n(route.ts)" as WhoRoute
+end box
+participant "Keycloak\n(realm: chura)" as KC
+box "Backend (Fiber)" #EEFFEE
+  participant "KeycloakAuth\nmiddleware" as MW
+  participant "AuthHandler" as AH
+end box
+
+== Backend startup ==
+MW -> KC : keyfunc.NewDefault(KEYCLOAK_JWKS_URL)\nfetch JWKS once, refreshed in background
+KC --> MW : public keys
+
+== Protected page without a session ==
+User -> Proxy : GET /board
+Proxy -> NA : auth(request)
+NA --> Proxy : no session
+Proxy --> User : 302 /login?callbackUrl=/board
+
+== Login (OIDC Authorization Code) ==
+User -> NA : GET /login
+NA -> NA : LoginRedirect component\nsignIn("keycloak", {callbackUrl}) (auto)
+NA --> User : 302 Keycloak login page (flowline theme)
+User -> KC : username / password
+KC --> User : 302 /api/auth/callback/keycloak?code=...
+User -> NA : GET callback?code=...
+NA -> KC : exchange code for tokens
+KC --> NA : access_token, id_token
+NA -> NA : jwt() callback\nstore accessToken + idToken in token
+NA --> User : Set-Cookie authjs.session-token (httpOnly)\n302 callbackUrl
+
+== Authenticated call to the backend ==
+User -> WhoRoute : GET /api/whoami (session cookie)
+WhoRoute -> WhoRoute : getToken() -> accessToken
+alt no accessToken
+  WhoRoute --> User : 401 Unauthenticated
+else has accessToken
+  WhoRoute -> MW : GET /api/v1/whoami\nAuthorization: Bearer <access_token>
+  activate MW
+  MW -> MW : verify JWT signature + expiry\n(public keys from cached JWKS)
+  alt missing / invalid token, or missing sub or email
+    MW --> WhoRoute : 401 {"error":"unauthenticated"}
+  else realm roles not exactly one of member / auditor
+    MW --> WhoRoute : 403 {"error":"forbidden"}
+  else valid
+    MW -> MW : Locals["actor"] = Actor{UserID, Email, Role}\nUserContext[UserKey] = AuthUser
+    MW -> AH : Next() -> WhoAmI
+    activate AH
+    AH --> MW : 200 {authenticated, user_id, email, roles}
+    deactivate AH
+    MW --> WhoRoute : 200
+  end
+  deactivate MW
+  WhoRoute --> User : proxy status + body
+end
+
+note over MW
+  ทุก route ใต้ /api/v1 ผ่าน middleware นี้
+  (ก่อนหน้านั้นมี recover, CORS และ body limit 1MB -> 413)
+  ไดอะแกรมอื่นจะย่อขั้นตอนนี้เหลือ "verify JWT -> Actor"
+end note
+@enduml

@@ -1,0 +1,54 @@
+@startuml 09-retrieve-work-items
+!include _style.puml
+title retrieveWorkItem() - get / list over WebSocket -> gRPC
+
+participant "Frontend\n(api/work-items.ts)" as FE
+participant "WebSocket handler\n/ws/work-items" as WS
+participant "WorkItemGateway\n(gRPC client)" as GW
+participant "gRPC Server" as GS
+participant "WorkItemService" as S
+database "MongoDB\n(work_items)" as M
+
+== Get one work item ==
+FE -> WS : {"operation":"get","id":"..."}
+WS -> GW : GetWorkItem(id)
+GW -> GS : GetWorkItem(GetWorkItemRequest)
+GS -> S : GetWorkItem(id)
+alt id is blank
+  S --> GS : error "id is required"
+  GS --> GW : InvalidArgument
+else
+  S -> M : repository.Get(id)
+  alt not found
+    M --> S : ErrNotFound
+    S --> GS : ErrNotFound
+    GS --> GW : NotFound
+  else found
+    M --> S : WorkItem
+    S --> GS : WorkItem
+    GS --> GW : WorkItem (proto)
+  end
+end
+GW --> WS : WorkItem / error
+WS --> FE : {"operation":"retrieved", "work_item" | "error"}
+
+== List work items of a project ==
+FE -> WS : {"operation":"list","project_id":"..."}
+WS -> GW : ListWorkItems(projectID)
+GW -> GS : ListWorkItems(ListWorkItemsRequest)
+GS -> S : ListWorkItems(projectID)
+alt project_id is blank
+  S --> GS : error "project_id is required"
+  GS --> GW : InvalidArgument
+  GW --> WS : error
+  WS --> FE : {"operation":"list","error":"..."}
+else
+  S -> M : repository.List(filter{ProjectID})\n(sort by created_at, _id)
+  M --> S : []WorkItem
+  S --> GS : []WorkItem
+  GS --> GW : ListWorkItemsResponse
+  GW --> WS : []WorkItem
+  WS --> FE : {"operation":"listed","work_items":[...]}
+end
+FE -> FE : filter by sprintId (client side)
+@enduml

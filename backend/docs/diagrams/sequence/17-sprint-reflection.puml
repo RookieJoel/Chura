@@ -1,0 +1,56 @@
+@startuml 17-sprint-reflection
+!include _style.puml
+title createSprintReflection() / retrieveSprintReflection()
+
+actor "Team Member" as C
+participant "KeycloakAuth\nmiddleware" as MW
+participant "AnalyticsHandler" as AH
+participant "AnalyticsReportingService" as AS
+database "PostgreSQL\n(sprints)" as PGS
+participant "ProjectConfigurationService\n(Project + Template Gateway)" as PCS
+database "PostgreSQL\n(sprint_reflections)" as PGR
+
+== PUT /api/v1/sprints/:id/reflections/me ==
+C -> MW : PUT /api/v1/sprints/:id/reflections/me\n{answers: {question_key: text}}
+MW -> AH : SubmitReflection
+AH -> AH : BodyParser
+alt invalid JSON
+  AH --> C : 400 invalid JSON body
+end
+AH -> AS : CreateSprintReflection(ctx, actor, sprintID, answers)
+activate AS
+AS -> PGS : sprints.GetByID(sprintID)
+PGS --> AS : *Sprint
+AS -> PCS : RetrieveProjectData(ctx, actor, projectID)
+PCS --> AS : *Project
+AS -> AS : actor.RequireTeamMember()
+alt Auditor
+  AS --> AH : ErrForbidden
+  AH --> C : 403 forbidden
+end
+AS -> PCS : RetrieveTemplateDefinition(ctx, actor, project.TemplateID)
+PCS --> AS : Template
+AS -> AS : template.Reflection.ValidateAnswers(answers)
+alt invalid answers
+  AS --> AH : InvalidInputError
+  AH --> C : 400 invalid input + violations
+end
+AS -> PGR : reflections.Upsert(SprintReflection{sprint, project, author, answers})
+note right of PGR : 1 reflection ต่อ (sprint, author)\nส่งซ้ำ = แทนที่ของเดิม
+PGR --> AS : *SprintReflection
+AS --> AH : *SprintReflection
+deactivate AS
+AH --> C : 200 SprintReflection
+
+== GET /api/v1/sprints/:id/reflections ==
+C -> MW : GET /api/v1/sprints/:id/reflections
+MW -> AH : ListReflections
+AH -> AS : RetrieveSprintReflection(ctx, actor, sprintID)
+activate AS
+AS -> AS : loadVisible(sprintID)
+AS -> PGR : reflections.ListBySprint(sprintID)
+PGR --> AS : []SprintReflection
+AS --> AH : []SprintReflection
+deactivate AS
+AH --> C : 200 [SprintReflection...]
+@enduml
