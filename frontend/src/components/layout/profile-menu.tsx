@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ChevronDownIcon } from "@/components/icons";
 import type { WhoAmI } from "@/types/auth";
 
 export function ProfileMenu() {
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [identity, setIdentity] = useState<WhoAmI>();
   const [error, setError] = useState(false);
@@ -18,7 +17,9 @@ export function ProfileMenu() {
       .then(async (response) => {
         if (response.status === 401) {
           const callbackUrl = `${pathname}${window.location.search}`;
-          router.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+          window.location.replace(
+            `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+          );
           throw new Error("Session expired");
         }
         if (!response.ok) {
@@ -42,7 +43,7 @@ export function ProfileMenu() {
     return () => {
       active = false;
     };
-  }, [pathname, router]);
+  }, [pathname]);
 
   if (!identity) {
     return (

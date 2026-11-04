@@ -1,16 +1,9 @@
-import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
-import { sessionCookieName } from "../../../../auth";
+import { auth } from "../../../../auth";
 
-export async function GET(request: Request) {
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-    cookieName: sessionCookieName,
-    secureCookie: process.env.NODE_ENV === "production",
-  });
-  const accessToken =
-    typeof token?.accessToken === "string" ? token.accessToken : undefined;
+export async function GET() {
+  const session = await auth();
+  const accessToken = session?.accessToken;
 
   if (!accessToken) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });

@@ -42,7 +42,9 @@ export interface WorkItem {
 
 export interface Sprint {
   id: string;
+  projectId?: string;
   name: string;
+  team?: string;
   startDate: string;
   endDate: string;
   status: "active" | "planned" | "completed";

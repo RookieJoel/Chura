@@ -6,10 +6,10 @@ import { ProfileMenu } from "@/components/layout/profile-menu";
 
 export function TopNav() {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-5">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-6">
       <div className="flex items-center gap-3.5">
         <Link href="/board" className="flex items-center gap-2">
-          <div className="flex size-[26px] items-center justify-center rounded-[7px] bg-brand text-sm font-extrabold text-white">
+          <div className="flex size-[28px] items-center justify-center rounded-md bg-brand text-sm font-extrabold text-white shadow-sm">
             C
           </div>
           <span className="text-[15px] font-bold tracking-tight text-text">
@@ -26,7 +26,7 @@ export function TopNav() {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <div className="flex w-[220px] items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-text-tertiary">
+        <div className="flex w-[240px] items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-text-tertiary transition-colors focus-within:border-brand">
           <SearchIcon className="size-3.5" />
           <span className="text-[12.5px]">Search work items</span>
         </div>

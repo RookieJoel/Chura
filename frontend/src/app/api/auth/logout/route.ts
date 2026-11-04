@@ -1,14 +1,8 @@
-import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
-import { sessionCookieName } from "../../../../../auth";
+import { auth, sessionCookieName } from "../../../../../auth";
 
 export async function GET(request: Request) {
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-    cookieName: sessionCookieName,
-    secureCookie: process.env.NODE_ENV === "production",
-  });
+  const session = await auth();
   const cookieNames: string[] = [];
   for (const cookie of request.headers.get("cookie")?.split(";") ?? []) {
     const name = cookie.split("=")[0]?.trim();
@@ -27,8 +21,8 @@ export async function GET(request: Request) {
     new URL("/", request.url).toString(),
   );
 
-  if (typeof token?.idToken === "string") {
-    logoutUrl.searchParams.set("id_token_hint", token.idToken);
+  if (typeof session?.idToken === "string") {
+    logoutUrl.searchParams.set("id_token_hint", session.idToken);
   }
 
   const response = NextResponse.redirect(logoutUrl);

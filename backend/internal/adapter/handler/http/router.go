@@ -13,6 +13,7 @@ func NewRouter(
 	frontendURL string,
 	instanceName string,
 	authMiddleware fiber.Handler,
+	workItemHandlers ...*WorkItemHandler,
 ) *fiber.App {
 	app := NewBaseApp(frontendURL, instanceName)
 

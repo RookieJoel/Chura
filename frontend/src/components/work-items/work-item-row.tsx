@@ -1,13 +1,14 @@
 "use client"
 
 import Link from "next/link";
-import type { Member, WorkItem } from "@/types/work-item";
+import type { Member, Sprint, WorkItem } from "@/types/work-item";
 import { TypeBadge } from "@/components/work-items/type-badge";
 import { PriorityIcon } from "@/components/work-items/priority-icon";
 import { PointsBadge } from "@/components/work-items/points-badge";
 import { EpicPill } from "@/components/work-items/epic-pill";
 import { WorkItemAvatar } from "@/components/work-items/avatar";
 import { cn } from "@/lib/cn";
+import { STATUS_LABELS } from "@/lib/work-item-utils";
 import { PlusIcon } from "../icons";
 import React from "react";
 
@@ -17,25 +18,61 @@ interface WorkItemRowProps {
   className?: string;
   state?: "pending" | "resolved" | "error";
   error?: string;
+  sprints?: Sprint[];
+  onSprintChange?: (sprintId: string | null) => void;
 }
 
-export function WorkItemRow({ item, assignee, className, state, error }: WorkItemRowProps) {
+export function WorkItemRow({
+  item,
+  assignee,
+  className,
+  state,
+  error,
+  sprints = [],
+  onSprintChange,
+}: WorkItemRowProps) {
+  const statusLabel =
+    STATUS_LABELS[item.status] ??
+    item.status.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+
   if (!state || state === "resolved") {
     return (
       <Link
         href={`/work-items/${item.id}`}
         className={cn(
-          "flex items-center gap-3 border-b border-border px-3.5 py-[9px] last:border-b-0 hover:bg-background",
+          "group flex items-center gap-3 border-b border-border px-4 py-2.5 last:border-b-0 hover:bg-[#f4f5f7]",
           className,
         )}
       >
         {item.type ? <TypeBadge type={item.type} size="md" /> : null}
-        <span className="w-[76px] shrink-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11.5px] font-bold text-text-tertiary">
+        <span className="w-[88px] shrink-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11.5px] font-bold text-brand-dark">
           {item.id}
         </span>
-        <span className="flex-1 truncate text-[13px] font-medium text-text">
+        <span className="flex-1 truncate text-[13px] font-medium text-text group-hover:text-brand-dark">
           {item.title}
         </span>
+        <span className="hidden rounded-full border border-border bg-background px-2 py-1 text-[11px] font-semibold text-text-secondary sm:inline-flex">
+          Status: {statusLabel}
+        </span>
+        {onSprintChange && (
+          <select
+            value={item.sprintId ?? ""}
+            aria-label={`Sprint for ${item.title}`}
+            onClick={(event) => event.preventDefault()}
+            onChange={(event) => {
+              event.preventDefault();
+              onSprintChange(event.target.value || null);
+            }}
+            className="max-w-[130px] rounded-md border border-border bg-surface px-2 py-1 text-[11px] font-semibold text-text-secondary outline-none focus:border-brand"
+          >
+            <option value="">Backlog</option>
+            {sprints.map((sprint) => (
+              <option key={sprint.id} value={sprint.id}>
+                {sprint.name}
+              </option>
+            ))}
+          </select>
+        )}
         <EpicPill epic={item.epic} />
         <PriorityIcon priority={item.priority} />
         <PointsBadge points={item.storyPoints} />

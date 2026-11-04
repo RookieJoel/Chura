@@ -88,6 +88,7 @@ KEYCLOAK_ISSUER=http://localhost:8080/realms/chura
 KEYCLOAK_CLIENT_ID=chura-auth-client
 KEYCLOAK_CLIENT_SECRET=
 CHURA_API_URL=http://localhost:8083
+NEXT_PUBLIC_CHURA_PROJECT_ID=<project UUID>
 NEXT_PUBLIC_WORK_ITEM_RPC_URL=ws://localhost:8083/ws/work-items
 # Optional; defaults to the Postgres seed project (make seed-dev)
 NEXT_PUBLIC_CHURA_PROJECT_ID=11111111-1111-4111-8111-111111111111
@@ -102,6 +103,8 @@ Backlog work items use the seeded dev project id
 Every frontend page requires a Keycloak session. After login, the server
 forwards the session's access token to `/api/v1/whoami`; the verified ID,
 email, and roles are available from the profile menu in the top navigation.
+Sprint and Work Item requests go through the Next.js `/api/backend/*` proxy,
+which forwards the session token to the authenticated REST API.
 
 Unauthenticated requests are sent to the `/login` server page. That page calls
 `signIn("keycloak", { redirectTo })` directly, so Auth.js starts the Keycloak
