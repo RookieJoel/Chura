@@ -141,7 +141,7 @@ services:
       KONG_DNS_NOT_FOUND_TTL: 30
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
-    entrypoint: ["/kong-entrypoint.sh"]
+    entrypoint: ["/bin/sh", "/kong-entrypoint.sh"]
     volumes:
       - ./kong/kong.yml:/kong/kong.yml:ro
       - ./kong/entrypoint.sh:/kong-entrypoint.sh:ro

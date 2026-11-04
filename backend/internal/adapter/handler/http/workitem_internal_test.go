@@ -22,6 +22,10 @@ func (g fakeWorkItemGateway) ListWorkItems(string) ([]domain.WorkItem, error) {
 	return []domain.WorkItem{{ID: "1"}}, g.err
 }
 
+func (g fakeWorkItemGateway) ListWorkItemsBySprint(string) ([]domain.WorkItem, error) {
+	return []domain.WorkItem{{ID: "1"}}, g.err
+}
+
 func (g fakeWorkItemGateway) UpdateWorkItem(item domain.WorkItem) (domain.WorkItem, error) {
 	return item, g.err
 }
@@ -30,7 +34,7 @@ func (g fakeWorkItemGateway) DeleteWorkItem(string) error { return g.err }
 
 func TestHandleWorkItemMessage_RoutesOperations(t *testing.T) {
 	cases := []struct{ op, want string }{
-		{"create", "created"}, {" GET ", "retrieved"}, {"list", "listed"},
+		{"create", "created"}, {"validate", "validated"}, {" GET ", "retrieved"}, {"list", "listed"},
 		{"update", "updated"}, {"delete", "deleted"},
 	}
 	for _, tc := range cases {
@@ -38,6 +42,17 @@ func TestHandleWorkItemMessage_RoutesOperations(t *testing.T) {
 		if got.Operation != tc.want || got.Error != "" {
 			t.Fatalf("%s: got %+v", tc.op, got)
 		}
+	}
+}
+
+func TestHandleWorkItemMessage_UsesRequestAndSprintFields(t *testing.T) {
+	response := handleWorkItemMessage(fakeWorkItemGateway{}, workItemMessage{
+		RequestID: "request-1",
+		Operation: "list",
+		SprintID:  "sprint-1",
+	})
+	if response.Operation != "listed" || len(response.WorkItems) != 1 {
+		t.Fatalf("unexpected response: %+v", response)
 	}
 }
 

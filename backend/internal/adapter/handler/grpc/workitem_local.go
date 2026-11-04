@@ -26,6 +26,10 @@ func (gateway *LocalWorkItemGateway) ListWorkItems(projectID string) ([]domain.W
 	return gateway.service.ListWorkItems(projectID)
 }
 
+func (gateway *LocalWorkItemGateway) ListWorkItemsBySprint(sprintID string) ([]domain.WorkItem, error) {
+	return gateway.service.ListWorkItemsBySprint(sprintID)
+}
+
 func (gateway *LocalWorkItemGateway) UpdateWorkItem(item domain.WorkItem) (domain.WorkItem, error) {
 	return gateway.service.UpdateWorkItem(item)
 }
