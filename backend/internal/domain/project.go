@@ -36,6 +36,14 @@ type Project struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type ProjectSummary struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	TemplateID  string `json:"template_id"`
+	Mode        Mode   `json:"mode"`
+}
+
 type Member struct {
 	UserID string      `json:"user_id"`
 	Email  string      `json:"email"`

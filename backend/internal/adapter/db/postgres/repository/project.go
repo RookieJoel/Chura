@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 
@@ -74,6 +75,58 @@ func (r *ProjectRepository) GetByID(ctx context.Context, id string) (*domain.Pro
 		Mode: domain.Mode(model.Mode), CreatedBy: model.CreatedBy, GroupID: model.GroupID,
 		CreatedAt: model.CreatedAt, UpdatedAt: model.UpdatedAt,
 	}, nil
+}
+
+func (r *ProjectRepository) ListSummaries(ctx context.Context, query out.ProjectListQuery) ([]domain.ProjectSummary, int, error) {
+	if query.ProjectIDs != nil {
+		projectIDs := make([]string, 0, len(query.ProjectIDs))
+		for _, id := range query.ProjectIDs {
+			if _, err := uuid.Parse(id); err == nil {
+				projectIDs = append(projectIDs, id)
+			}
+		}
+		query.ProjectIDs = projectIDs
+		if len(query.ProjectIDs) == 0 {
+			return []domain.ProjectSummary{}, 0, nil
+		}
+	}
+	newQuery := func() *gorm.DB {
+		projects := r.db.WithContext(ctx).Model(&projectModel{})
+		if query.ProjectIDs != nil {
+			projects = projects.Where("id IN ?", query.ProjectIDs)
+		}
+		return projects
+	}
+	if query.ProjectIDs != nil {
+		if len(query.ProjectIDs) == 0 {
+			return []domain.ProjectSummary{}, 0, nil
+		}
+	}
+
+	var total int64
+	if err := newQuery().Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("count projects: %w", err)
+	}
+
+	var models []projectModel
+	if err := newQuery().
+		Select("id", "name", "description", "template_id", "mode").
+		Order("name ASC").
+		Order("id ASC").
+		Offset(query.Offset).
+		Limit(query.Limit).
+		Find(&models).Error; err != nil {
+		return nil, 0, fmt.Errorf("list project summaries: %w", err)
+	}
+
+	summaries := make([]domain.ProjectSummary, 0, len(models))
+	for _, model := range models {
+		summaries = append(summaries, domain.ProjectSummary{
+			ID: model.ID, Name: model.Name, Description: model.Description,
+			TemplateID: model.TemplateID, Mode: domain.Mode(model.Mode),
+		})
+	}
+	return summaries, int(total), nil
 }
 
 // WithMembershipLock holds a per-project lock for the duration of fn. An

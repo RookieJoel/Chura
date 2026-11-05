@@ -70,6 +70,45 @@ func (s *ProjectConfigurationService) RetrieveTemplateDefinition(ctx context.Con
 	return template, nil
 }
 
+func (s *ProjectConfigurationService) ListAccessibleProjects(ctx context.Context, actor domain.Actor, query in.ProjectListQuery) (in.ProjectListResult, error) {
+	if err := actor.Validate(); err != nil {
+		return in.ProjectListResult{}, fmt.Errorf("list accessible projects: %w", err)
+	}
+	if query.Page < 1 || query.PageSize < 1 || query.PageSize > in.MaxProjectPageSize {
+		return in.ProjectListResult{}, fmt.Errorf("list accessible projects: %w", domain.ErrInvalidInput)
+	}
+	maxInt := int(^uint(0) >> 1)
+	if query.Page-1 > maxInt/query.PageSize {
+		return in.ProjectListResult{}, fmt.Errorf("list accessible projects: %w", domain.ErrInvalidInput)
+	}
+
+	repositoryQuery := out.ProjectListQuery{
+		Offset: (query.Page - 1) * query.PageSize,
+		Limit:  query.PageSize,
+	}
+	if actor.Role == domain.SystemRoleTeamMember {
+		projectIDs, err := s.directory.ListProjectMemberships(ctx, actor.UserID)
+		if err != nil {
+			return in.ProjectListResult{}, fmt.Errorf("list accessible projects: %w", err)
+		}
+		if len(projectIDs) == 0 {
+			return in.ProjectListResult{
+				Items: []domain.ProjectSummary{}, Page: query.Page, PageSize: query.PageSize,
+			}, nil
+		}
+		repositoryQuery.ProjectIDs = projectIDs
+	}
+
+	items, total, err := s.repo.ListSummaries(ctx, repositoryQuery)
+	if err != nil {
+		return in.ProjectListResult{}, fmt.Errorf("list accessible projects: %w", err)
+	}
+	if items == nil {
+		items = []domain.ProjectSummary{}
+	}
+	return in.ProjectListResult{Items: items, Page: query.Page, PageSize: query.PageSize, Total: total}, nil
+}
+
 func (s *ProjectConfigurationService) CreateProjectBoard(ctx context.Context, actor domain.Actor, input in.CreateProjectInput) (*domain.Project, error) {
 	if err := actor.RequireTeamMember(); err != nil {
 		return nil, fmt.Errorf("create project: %w", err)

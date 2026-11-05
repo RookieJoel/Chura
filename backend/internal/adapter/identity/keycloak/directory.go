@@ -191,6 +191,40 @@ func (d *Directory) FindUserByID(ctx context.Context, userID string) (domain.Dir
 	return found, err
 }
 
+func (d *Directory) ListProjectMemberships(ctx context.Context, userID string) ([]string, error) {
+	var projectIDs []string
+	err := d.call(ctx, "list user project memberships", func(ctx context.Context, token string) error {
+		groups, err := collectPages(func(first, max int) ([]*gocloak.Group, error) {
+			return d.client.GetUserGroups(ctx, token, d.realm, userID, gocloak.GetGroupsParams{
+				First: gocloak.IntP(first),
+				Max:   gocloak.IntP(max),
+			})
+		}, memberPageSize, maxGroupMembers)
+		if err != nil {
+			return err
+		}
+		projectIDs = projectIDsFromGroups(groups)
+		return nil
+	})
+	return projectIDs, err
+}
+
+func projectIDsFromGroups(groups []*gocloak.Group) []string {
+	projectIDs := make([]string, 0, len(groups))
+	for _, group := range groups {
+		if group == nil {
+			continue
+		}
+		name := gocloak.PString(group.Name)
+		if strings.HasPrefix(name, groupNamePrefix) {
+			if projectID := strings.TrimPrefix(name, groupNamePrefix); projectID != "" {
+				projectIDs = append(projectIDs, projectID)
+			}
+		}
+	}
+	return projectIDs
+}
+
 // systemRole maps effective realm roles to a Chura system role; neither or both yield "".
 func systemRole(roles []*gocloak.Role) domain.SystemRole {
 	var isMember, isAuditor bool

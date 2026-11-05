@@ -3,10 +3,12 @@ package service_test
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
+	"github.com/RookieJoel/Chura/backend/internal/port/out"
 )
 
 // writeDelay is the pause before a directory write lands.
@@ -30,6 +32,8 @@ type fakeProjectRepo struct {
 	writes    int // number of mutating calls, to prove read-only operations persist nothing
 	log       *callLog
 	createErr error
+	listQuery out.ProjectListQuery
+	listErr   error
 	lockMu    sync.Mutex // real mutex so concurrency tests exercise serialisation
 	locks     int        // times WithMembershipLock was taken
 }
@@ -58,6 +62,40 @@ func (r *fakeProjectRepo) GetByID(_ context.Context, id string) (*domain.Project
 	return &p, nil
 }
 
+func (r *fakeProjectRepo) ListSummaries(_ context.Context, query out.ProjectListQuery) ([]domain.ProjectSummary, int, error) {
+	r.log.record("repo.ListSummaries")
+	r.listQuery = query
+	if r.listErr != nil {
+		return nil, 0, r.listErr
+	}
+	allowed := make(map[string]struct{}, len(query.ProjectIDs))
+	for _, id := range query.ProjectIDs {
+		allowed[id] = struct{}{}
+	}
+	summaries := make([]domain.ProjectSummary, 0, len(r.projects))
+	for id, project := range r.projects {
+		if query.ProjectIDs != nil {
+			if _, ok := allowed[id]; !ok {
+				continue
+			}
+		}
+		summaries = append(summaries, domain.ProjectSummary{
+			ID: project.ID, Name: project.Name, Description: project.Description,
+			TemplateID: project.TemplateID, Mode: project.Mode,
+		})
+	}
+	sort.Slice(summaries, func(i, j int) bool {
+		if summaries[i].Name == summaries[j].Name {
+			return summaries[i].ID < summaries[j].ID
+		}
+		return summaries[i].Name < summaries[j].Name
+	})
+	total := len(summaries)
+	start := min(query.Offset, total)
+	end := min(start+query.Limit, total)
+	return summaries[start:end], total, nil
+}
+
 func (r *fakeProjectRepo) WithMembershipLock(ctx context.Context, projectID string, fn func(ctx context.Context) error) error {
 	r.lockMu.Lock()
 	defer r.lockMu.Unlock()
@@ -69,12 +107,13 @@ func (r *fakeProjectRepo) WithMembershipLock(ctx context.Context, projectID stri
 // fakeDirectory is an in-memory out.ProjectDirectory. errs injects a failure
 // per method name; every call is recorded, with its arguments, in log.
 type fakeDirectory struct {
-	mu      sync.Mutex
-	users   map[string]domain.DirectoryUser // by email
-	log     *callLog
-	errs    map[string]error
-	members map[string][]domain.Member // by group id
-	groups  map[string]string          // project id -> group id
+	mu                 sync.Mutex
+	users              map[string]domain.DirectoryUser // by email
+	log                *callLog
+	errs               map[string]error
+	members            map[string][]domain.Member // by group id
+	groups             map[string]string          // project id -> group id
+	projectMemberships []string
 }
 
 func newFakeDirectory(log *callLog) *fakeDirectory {
@@ -114,6 +153,14 @@ func (d *fakeDirectory) FindUserByID(_ context.Context, userID string) (domain.D
 		}
 	}
 	return domain.DirectoryUser{}, fmt.Errorf("user %s: %w", userID, domain.ErrNotFound)
+}
+
+func (d *fakeDirectory) ListProjectMemberships(_ context.Context, userID string) ([]string, error) {
+	d.log.record("ListProjectMemberships(%s)", userID)
+	if err := d.errs["ListProjectMemberships"]; err != nil {
+		return nil, err
+	}
+	return append([]string(nil), d.projectMemberships...), nil
 }
 
 func (d *fakeDirectory) FindUserByEmail(_ context.Context, email string) (domain.DirectoryUser, error) {

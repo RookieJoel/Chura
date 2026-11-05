@@ -47,6 +47,22 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/projects:
+    get:
+      summary: List accessible Projects (listAccessibleProjects). Team Members see their memberships; Auditors see all.
+      operationId: listAccessibleProjects
+      parameters:
+        - $ref: "#/components/parameters/ProjectPage"
+        - $ref: "#/components/parameters/ProjectPageSize"
+      responses:
+        "200":
+          description: A deterministic page of accessible Project summaries; total is the count before pagination.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectList" }
+        "400": { $ref: "#/components/responses/InvalidInput" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
     post:
       summary: Create a Project / Project Board (createProjectBoard). Team Member only.
       operationId: createProjectBoard
@@ -416,6 +432,18 @@ components:
         Keycloak access token. The realm role `member` acts as Team Member and
         `auditor` as Auditor; an account with neither or both roles gets 403.
   parameters:
+    ProjectPage:
+      name: page
+      in: query
+      required: false
+      description: One-based page number. Defaults to 1.
+      schema: { type: integer, minimum: 1, default: 1 }
+    ProjectPageSize:
+      name: page_size
+      in: query
+      required: false
+      description: Number of Projects per page. Defaults to 15; maximum is 30.
+      schema: { type: integer, minimum: 1, maximum: 30, default: 15 }
     ProjectId:
       name: projectId
       in: path
@@ -590,6 +618,25 @@ components:
         name: { type: string, minLength: 1, maxLength: 100, description: Trimmed; duplicates allowed }
         description: { type: string, maxLength: 2000, description: Trimmed }
         template_id: { type: string }
+    ProjectSummary:
+      type: object
+      required: [id, name, description, template_id, mode]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        template_id: { type: string }
+        mode: { type: string, enum: [general, se] }
+    ProjectList:
+      type: object
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ProjectSummary" }
+        page: { type: integer, minimum: 1 }
+        page_size: { type: integer, minimum: 1, maximum: 30 }
+        total: { type: integer, minimum: 0 }
     Member:
       type: object
       required: [user_id, email, name, role]

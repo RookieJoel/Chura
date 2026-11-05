@@ -92,6 +92,21 @@ func TestToMember(t *testing.T) {
 	}
 }
 
+func TestProjectIDsFromGroups(t *testing.T) {
+	groups := []*gocloak.Group{
+		nil,
+		{Name: gocloak.StringP("realm-users")},
+		{Name: gocloak.StringP("project-")},
+		{Name: gocloak.StringP("project-project-123")},
+		{Name: gocloak.StringP("project-project-456")},
+	}
+	got := projectIDsFromGroups(groups)
+	want := []string{"project-123", "project-456"}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("projectIDsFromGroups() = %v, want %v", got, want)
+	}
+}
+
 func TestClassify(t *testing.T) {
 	other := errors.New("boom")
 	cases := []struct {

@@ -9,6 +9,7 @@ func RegisterProjectRoutes(api fiber.Router, templateHandler *TemplateHandler, p
 	api.Get("/templates", templateHandler.List)
 	api.Get("/templates/:id", templateHandler.Get)
 
+	api.Get("/projects", projectHandler.List)
 	api.Post("/projects", projectHandler.Create)
 	api.Get("/projects/:id", projectHandler.Get)
 	api.Post("/projects/:id/members", projectHandler.AddMember)

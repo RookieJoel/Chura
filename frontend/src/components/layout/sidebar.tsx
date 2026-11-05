@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { members } from "@/lib/mock-data";
 import {
   CalendarIcon,
-  ChevronDownIcon,
   ColumnsIcon,
   ListIcon,
 } from "@/components/icons";
@@ -31,7 +30,6 @@ export function Sidebar() {
         </div>
         <div className="mt-1 flex items-center justify-between text-[13px] font-bold text-text">
           Chura Demo App
-          <ChevronDownIcon className="size-3.5 text-text-tertiary" />
         </div>
       </div>
       {NAV_ITEMS.map(({ href, label, icon: ItemIcon }) => {

@@ -1,6 +1,9 @@
 package http
 
 import (
+	"fmt"
+	"strconv"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/RookieJoel/Chura/backend/internal/domain"
@@ -35,6 +38,41 @@ func (h *ProjectHandler) Create(c *fiber.Ctx) error {
 		return writeError(c, err)
 	}
 	return c.Status(fiber.StatusCreated).JSON(project)
+}
+
+func (h *ProjectHandler) List(c *fiber.Ctx) error {
+	query, err := projectListQuery(c)
+	if err != nil {
+		return writeError(c, err)
+	}
+	result, err := h.service.ListAccessibleProjects(c.UserContext(), actorFrom(c), query)
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(result)
+}
+
+func projectListQuery(c *fiber.Ctx) (in.ProjectListQuery, error) {
+	query := in.ProjectListQuery{Page: 1, PageSize: in.DefaultProjectPageSize}
+	parameters := []struct {
+		name   string
+		target *int
+	}{{"page", &query.Page}, {"page_size", &query.PageSize}}
+	for _, parameter := range parameters {
+		raw, exists := c.Queries()[parameter.name]
+		if !exists {
+			continue
+		}
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			return in.ProjectListQuery{}, fmt.Errorf("invalid %s: %w", parameter.name, domain.ErrInvalidInput)
+		}
+		*parameter.target = value
+	}
+	if query.Page < 1 || query.PageSize < 1 || query.PageSize > in.MaxProjectPageSize {
+		return in.ProjectListQuery{}, fmt.Errorf("invalid project list pagination: %w", domain.ErrInvalidInput)
+	}
+	return query, nil
 }
 
 func (h *ProjectHandler) Get(c *fiber.Ctx) error {

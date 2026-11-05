@@ -11,10 +11,18 @@ type ProjectRepository interface {
 	Create(ctx context.Context, project *domain.Project) error
 	// GetByID returns the project row with Members nil; domain.ErrNotFound if missing.
 	GetByID(ctx context.Context, id string) (*domain.Project, error)
+	// ListSummaries applies the optional project-ID scope before counting and paging.
+	ListSummaries(ctx context.Context, query ProjectListQuery) ([]domain.ProjectSummary, int, error)
 	// WithMembershipLock runs fn while holding a transaction-scoped advisory
 	// lock for the project, serialising membership changes across instances.
 	// fn's error is returned unchanged.
 	WithMembershipLock(ctx context.Context, projectID string, fn func(ctx context.Context) error) error
+}
+
+type ProjectListQuery struct {
+	ProjectIDs []string
+	Offset     int
+	Limit      int
 }
 
 // ProjectDirectory is the identity store holding Project membership and Project Role.
@@ -22,6 +30,7 @@ type ProjectRepository interface {
 type ProjectDirectory interface {
 	CreateProjectGroup(ctx context.Context, projectID string) (groupID string, err error)
 	DeleteProjectGroup(ctx context.Context, groupID string) error
+	ListProjectMemberships(ctx context.Context, userID string) ([]string, error)
 	FindUserByID(ctx context.Context, userID string) (domain.DirectoryUser, error)
 	FindUserByEmail(ctx context.Context, email string) (domain.DirectoryUser, error) // ErrNotFound
 	ListMembers(ctx context.Context, groupID, projectID string) ([]domain.Member, error)
