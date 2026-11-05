@@ -38,7 +38,7 @@ docker compose -f deploy/docker-compose.yml up -d --build
 
 The Kong API gateway is available at
 [http://localhost:8083](http://localhost:8083) (routes to project/sprint/analytics/workitem via Consul), and the WorkItem WebSocket is
-available at `ws://localhost:8083/ws/work-items`.
+available at `ws://127.0.0.1:8083/ws/work-items`.
 
 ### 3. Start the frontend
 
@@ -89,7 +89,7 @@ KEYCLOAK_CLIENT_ID=chura-auth-client
 KEYCLOAK_CLIENT_SECRET=
 CHURA_API_URL=http://localhost:8083
 NEXT_PUBLIC_CHURA_PROJECT_ID=<project UUID>
-NEXT_PUBLIC_WORK_ITEM_RPC_URL=ws://localhost:8083/ws/work-items
+NEXT_PUBLIC_WORK_ITEM_RPC_URL=ws://127.0.0.1:8083/ws/work-items
 # Optional; defaults to the Postgres seed project (make seed-dev)
 NEXT_PUBLIC_CHURA_PROJECT_ID=11111111-1111-4111-8111-111111111111
 ```
@@ -103,8 +103,10 @@ Backlog work items use the seeded dev project id
 Every frontend page requires a Keycloak session. After login, the server
 forwards the session's access token to `/api/v1/whoami`; the verified ID,
 email, and roles are available from the profile menu in the top navigation.
-Sprint and Work Item requests go through the Next.js `/api/backend/*` proxy,
-which forwards the session token to the authenticated REST API.
+Sprint requests go through the Next.js `/api/backend/*` proxy. WorkItem CRUD
+uses the authenticated `/ws/work-items` WebSocket; the Next.js `/api/ws-token`
+route bridges the Auth.js session to the backend bearer-token handshake using
+the negotiated `chura-auth` WebSocket subprotocol.
 
 Unauthenticated requests are sent to the `/login` server page. That page calls
 `signIn("keycloak", { redirectTo })` directly, so Auth.js starts the Keycloak
