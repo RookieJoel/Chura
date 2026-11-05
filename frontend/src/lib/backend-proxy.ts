@@ -2,7 +2,11 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import { sessionCookieName } from "../../auth";
 
-export async function proxyBackendGet(request: Request, path: string) {
+async function proxyBackendRequest(
+  request: Request,
+  path: string,
+  method: "GET" | "POST",
+) {
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
@@ -25,8 +29,21 @@ export async function proxyBackendGet(request: Request, path: string) {
   }
 
   try {
+    const headers = new Headers({
+      Authorization: `Bearer ${accessToken}`,
+    });
+    const body =
+      method === "POST" ? await request.arrayBuffer() : undefined;
+    if (method === "POST") {
+      headers.set(
+        "content-type",
+        request.headers.get("content-type") ?? "application/json",
+      );
+    }
     const response = await fetch(`${apiUrl.replace(/\/$/, "")}${path}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      method,
+      headers,
+      body: body && body.byteLength > 0 ? body : undefined,
       cache: "no-store",
     });
     return new NextResponse(await response.text(), {
@@ -42,4 +59,12 @@ export async function proxyBackendGet(request: Request, path: string) {
       { status: 502 },
     );
   }
+}
+
+export function proxyBackendGet(request: Request, path: string) {
+  return proxyBackendRequest(request, path, "GET");
+}
+
+export function proxyBackendPost(request: Request, path: string) {
+  return proxyBackendRequest(request, path, "POST");
 }

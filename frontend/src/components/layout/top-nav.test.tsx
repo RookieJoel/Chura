@@ -75,7 +75,22 @@ describe("TopNav project selector", () => {
     expect(screen.getByRole("status", { name: "Loading Projects" })).toBeInTheDocument();
     expect(await screen.findByText("No accessible Projects")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Project" })).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Create Project" })).toHaveAttribute(
+      "href",
+      "/projects/new",
+    );
     expect(localStorage.getItem("chura.selectedProjectId")).toBeNull();
+  });
+
+  it("keeps the Project overview shell free of Sprint and Work Item controls", async () => {
+    vi.mocked(listProjects).mockResolvedValue(projects);
+    render(<AppShell minimal><main>Project overview content</main></AppShell>);
+
+    expect(await screen.findByText("Project overview content")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Project" })).toBeInTheDocument();
+    expect(screen.queryByText("Search work items")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Sprints" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Board" })).not.toBeInTheDocument();
   });
 
   it("shows discovery errors and allows retry", async () => {

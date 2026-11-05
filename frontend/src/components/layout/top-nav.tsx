@@ -7,7 +7,7 @@ import { WorkItemAvatar } from "@/components/work-items/avatar";
 import { ProfileMenu } from "@/components/layout/profile-menu";
 import { useProjects } from "@/components/layout/project-provider";
 
-export function TopNav() {
+export function TopNav({ minimal = false }: { minimal?: boolean }) {
   const {
     projects,
     selectedProjectId,
@@ -58,6 +58,12 @@ export function TopNav() {
             )}
           </select>
         </label>
+        <Link
+          href="/projects/new"
+          className="rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-text-secondary hover:bg-background hover:text-text"
+        >
+          Create Project
+        </Link>
         {loadState === "loading" && (
           <span role="status" aria-label="Loading Projects" className="sr-only">
             Loading Projects…
@@ -80,21 +86,25 @@ export function TopNav() {
         )}
       </div>
       <div className="flex items-center gap-4">
-        <div className="flex w-[240px] items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-text-tertiary transition-colors focus-within:border-brand">
-          <SearchIcon className="size-3.5" />
-          <span className="text-[12.5px]">Search work items</span>
-        </div>
-        <div className="flex items-center">
-          {members.map((member, index) => (
-            <WorkItemAvatar
-              key={member.id}
-              member={member}
-              size="lg"
-              className={`border-2 border-surface ${index < members.length - 1 ? "-mr-2" : ""}`}
-            />
-          ))}
-        </div>
-        <BellIcon className="size-4 text-text-secondary" />
+        {!minimal && (
+          <>
+            <div className="flex w-[240px] items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-text-tertiary transition-colors focus-within:border-brand">
+              <SearchIcon className="size-3.5" />
+              <span className="text-[12.5px]">Search work items</span>
+            </div>
+            <div className="flex items-center">
+              {members.map((member, index) => (
+                <WorkItemAvatar
+                  key={member.id}
+                  member={member}
+                  size="lg"
+                  className={`border-2 border-surface ${index < members.length - 1 ? "-mr-2" : ""}`}
+                />
+              ))}
+            </div>
+            <BellIcon className="size-4 text-text-secondary" />
+          </>
+        )}
         <ProfileMenu />
       </div>
     </header>

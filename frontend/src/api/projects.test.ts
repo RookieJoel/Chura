@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { listProjects } from "@/api/projects";
+import { createProject, getProject, listProjects } from "@/api/projects";
 
 describe("listProjects", () => {
   it("requests the first page from the same-origin authenticated proxy", async () => {
@@ -17,7 +17,9 @@ describe("listProjects", () => {
     await expect(listProjects()).resolves.toEqual(projects.items);
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/projects?page=1&page_size=30", {
       cache: "no-store",
+      headers: { "content-type": "application/json" },
     });
+
   });
 
   it("loads every page before returning projects", async () => {
@@ -44,6 +46,76 @@ describe("listProjects", () => {
     await expect(listProjects()).resolves.toHaveLength(32);
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/projects?page=2&page_size=30", {
       cache: "no-store",
+      headers: { "content-type": "application/json" },
+    });
+  });
+
+  describe("Project API", () => {
+    it("creates a Project through the authenticated same-origin route", async () => {
+      const project = {
+        id: "p1",
+        name: "Alpha",
+        description: "",
+        template_id: "se",
+        mode: "se",
+      };
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(project), { status: 201 }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        createProject({
+          name: "Alpha",
+          description: "",
+          template_id: "se",
+        }),
+      ).resolves.toEqual(project);
+      expect(fetchMock).toHaveBeenCalledWith("/api/v1/projects", {
+        method: "POST",
+        body: JSON.stringify({
+          name: "Alpha",
+          description: "",
+          template_id: "se",
+        }),
+        cache: "no-store",
+        headers: { "content-type": "application/json" },
+      });
+    });
+
+    it("surfaces creation authorization and validation errors", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify({ error: "Team Member role required" }), {
+            status: 403,
+          }),
+        ),
+      );
+
+      await expect(
+        createProject({ name: "Alpha", description: "", template_id: "se" }),
+      ).rejects.toThrow("Team Member role required (403)");
+    });
+
+    it("retrieves a Project through the authenticated backend proxy", async () => {
+      const project = {
+        id: "project/id",
+        name: "Alpha",
+        description: "",
+        template_id: "se",
+        mode: "se",
+      };
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(project), { status: 200 }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(getProject("project/id")).resolves.toEqual(project);
+      expect(fetchMock).toHaveBeenCalledWith("/api/backend/projects/project%2Fid", {
+        cache: "no-store",
+        headers: { "content-type": "application/json" },
+      });
     });
   });
 

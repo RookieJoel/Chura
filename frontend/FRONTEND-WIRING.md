@@ -77,28 +77,34 @@ the Work Item WebSocket service; that dependency is outside this slice.
 can be implemented independently  
 **Source:** Project Configuration use case and Project Management requirements.
 
-- [ ] Add typed frontend API clients for listing and retrieving templates;
+- [x] Add typed frontend API clients for listing and retrieving templates;
   add same-origin authenticated proxy routes for both existing backend
   template endpoints and test query/response/error forwarding.
-- [ ] Add a same-origin authenticated create-project proxy/client that
+- [x] Add a same-origin authenticated create-project proxy/client that
   forwards the request and surfaces backend validation and authorization
   errors.
-- [ ] Add a Create Project entry to the project selector that remains
+- [x] Add a Create Project entry to the project selector that remains
   available when the Team Member has no accessible Projects.
-- [ ] Build a project creation flow for project name, description, and
+- [x] Build a project creation flow for project name, description, and
   explicit selection from the available templates.
-- [ ] Submit creation through the existing backend project-create route and
+- [x] Submit creation through the existing backend project-create route and
   surface validation and authorization errors; ensure the creator receives
   the template's creator role, which defines Project ownership.
-- [ ] Build the `/projects/:id` minimal overview route and, on successful
+- [x] Build the `/projects/:id` minimal overview route and, on successful
   creation, select the returned Project and navigate to it without Sprint or
   Work Item UI.
-- [ ] Add frontend tests for template loading/selection, successful creation,
+- [x] Add frontend tests for template loading/selection, successful creation,
   empty templates, validation/API failures, and authenticated proxy behavior.
 
-**Done when:** A Team Member can create a project from an available template,
-see actionable errors on failure, and land in the newly created Project's
-minimal overview.
+**Done:** Template list/detail and Project creation use authenticated
+same-origin proxy routes. A Team Member can create from an explicitly chosen
+template, sees backend errors, and lands on the new Project's minimal
+overview with the selection persisted. The overview omits Sprint and Work
+Item controls. The 10-file frontend test suite (28 tests), typecheck, lint,
+and production build pass; lint reports one pre-existing unused-import
+warning elsewhere. Browser verification exercised the create-to-overview
+flow with intercepted create/detail responses to avoid writing a test
+Project to the local database.
 
 ### 4. Project members and roles — vertical slice
 
@@ -275,16 +281,16 @@ slice. Repeated Project names are allowed; Projects are distinct by ID.
 
 ### Slice 3 — Project templates and creation
 
-- [ ] I can start Create Project from the selector, including when I have no
+- [x] I can start Create Project from the selector, including when I have no
   accessible Projects.
-- [ ] Available templates load; I must explicitly select one before
+- [x] Available templates load; I must explicitly select one before
   submitting.
-- [ ] A Team Member can create a Project with a valid name, description, and
+- [x] A Team Member can create a Project with a valid name, description, and
   template; the creator has the template's creator role.
-- [ ] Invalid input, unavailable templates, unauthenticated access, and
+- [x] Invalid input, unavailable templates, unauthenticated access, and
   backend failures show actionable errors without pretending creation
   succeeded.
-- [ ] On success, the new Project becomes selected and I land on its minimal
+- [x] On success, the new Project becomes selected and I land on its minimal
   overview, without Sprint or Work Item UI.
 
 ### Slice 4 — Project members and roles

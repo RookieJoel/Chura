@@ -1,7 +1,13 @@
-import { apiRequest } from "@/api/client";
+import { apiRequest, sameOriginRequest } from "@/api/client";
 import type { Member } from "@/types/work-item";
 
 const projectId = process.env.NEXT_PUBLIC_CHURA_PROJECT_ID;
+
+export interface CreateProjectInput {
+  name: string;
+  description: string;
+  template_id: string;
+}
 
 interface ApiProjectMember {
   user_id: string;
@@ -39,22 +45,9 @@ interface ProjectListPage {
 const projectPageSize = 30;
 
 async function requestProjectPage(page: number): Promise<ProjectListPage> {
-  const response = await fetch(
+  const result = await sameOriginRequest<ProjectListPage>(
     `/api/v1/projects?page=${page}&page_size=${projectPageSize}`,
-    { cache: "no-store" },
   );
-  if (!response.ok) {
-    let message = `Project discovery failed (${response.status})`;
-    try {
-      const body = (await response.json()) as { error?: unknown };
-      if (typeof body.error === "string") message = body.error;
-    } catch {
-      // Keep the status-based message if the proxy did not return JSON.
-    }
-    throw new Error(message);
-  }
-
-  const result = (await response.json()) as ProjectListPage;
   if (
     !result ||
     !Array.isArray(result.items) ||
@@ -108,4 +101,29 @@ export async function getCurrentProject(): Promise<CurrentProject> {
       };
     }),
   };
+}
+
+export async function createProject(
+  input: CreateProjectInput,
+): Promise<ProjectSummary> {
+  const project = await sameOriginRequest<ProjectSummary>("/api/v1/projects", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  if (
+    !project ||
+    typeof project.id !== "string" ||
+    !project.id ||
+    typeof project.name !== "string" ||
+    typeof project.description !== "string" ||
+    typeof project.template_id !== "string" ||
+    typeof project.mode !== "string"
+  ) {
+    throw new Error("Invalid Project creation response");
+  }
+  return project;
+}
+
+export async function getProject(projectId: string): Promise<ProjectSummary> {
+  return apiRequest<ProjectSummary>(`/projects/${encodeURIComponent(projectId)}`);
 }

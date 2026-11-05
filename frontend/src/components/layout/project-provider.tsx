@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -21,6 +22,7 @@ interface ProjectContextValue {
   projects: ProjectSummary[];
   selectedProjectId: string | null;
   selectProject: (projectId: string) => void;
+  registerCreatedProject: (project: ProjectSummary) => void;
   loadState: ProjectLoadState;
   error: string | null;
   refresh: () => void;
@@ -56,29 +58,43 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [loadState, setLoadState] = useState<ProjectLoadState>("loading");
   const [error, setError] = useState<string | null>(null);
   const [requestNumber, setRequestNumber] = useState(0);
+  const createdProjects = useRef(new Map<string, ProjectSummary>());
 
   useEffect(() => {
     let active = true;
     listProjects()
       .then((accessibleProjects) => {
         if (!active) return;
-        setProjects(accessibleProjects);
+        const mergedProjects = [
+          ...createdProjects.current.values(),
+          ...accessibleProjects.filter(
+            (project) => !createdProjects.current.has(project.id),
+          ),
+        ];
+        setProjects(mergedProjects);
         const storedProjectId = readStoredProjectId();
         const isAccessible = (id: string | null) =>
-          id !== null && accessibleProjects.some((project) => project.id === id);
+          id !== null && mergedProjects.some((project) => project.id === id);
         const nextProjectId = isAccessible(storedProjectId)
           ? storedProjectId
           : isAccessible(configuredDefaultProjectId)
             ? configuredDefaultProjectId
-            : (accessibleProjects[0]?.id ?? null);
+            : (mergedProjects[0]?.id ?? null);
         setSelectedProjectId(nextProjectId);
         persistSelectedProjectId(nextProjectId);
         setLoadState("ready");
       })
       .catch((reason: unknown) => {
         if (!active) return;
-        setProjects([]);
-        setSelectedProjectId(null);
+        const knownCreatedProjects = [...createdProjects.current.values()];
+        setProjects(knownCreatedProjects);
+        const storedProjectId = readStoredProjectId();
+        const selectedCreatedProject = knownCreatedProjects.some(
+          (project) => project.id === storedProjectId,
+        )
+          ? storedProjectId
+          : null;
+        setSelectedProjectId(selectedCreatedProject);
         setError(
           reason instanceof Error ? reason.message : "Project discovery failed",
         );
@@ -97,6 +113,17 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     },
     [projects],
   );
+  const registerCreatedProject = useCallback((project: ProjectSummary) => {
+    createdProjects.current.set(project.id, project);
+    setProjects((current) => [
+      project,
+      ...current.filter((item) => item.id !== project.id),
+    ]);
+    setSelectedProjectId(project.id);
+    persistSelectedProjectId(project.id);
+    setLoadState("ready");
+    setError(null);
+  }, []);
   const refresh = useCallback(() => {
     setLoadState("loading");
     setError(null);
@@ -107,11 +134,20 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       projects,
       selectedProjectId,
       selectProject,
+      registerCreatedProject,
       loadState,
       error,
       refresh,
     }),
-    [projects, selectedProjectId, selectProject, loadState, error, refresh],
+    [
+      projects,
+      selectedProjectId,
+      selectProject,
+      registerCreatedProject,
+      loadState,
+      error,
+      refresh,
+    ],
   );
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;

@@ -1,10 +1,10 @@
-export async function apiRequest<T>(
+export async function sameOriginRequest<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`/api/backend${path}`, {
+    response = await fetch(path, {
       ...init,
       headers: {
         "content-type": "application/json",
@@ -43,4 +43,11 @@ export async function apiRequest<T>(
     throw new Error(`${message} (${response.status})`);
   }
   return data as T;
+}
+
+export async function apiRequest<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  return sameOriginRequest<T>(`/api/backend${path}`, init);
 }
