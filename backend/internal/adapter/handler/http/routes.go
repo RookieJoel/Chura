@@ -37,12 +37,3 @@ func RegisterAnalyticsRoutes(api fiber.Router, analyticsHandler *AnalyticsHandle
 	api.Get("/sprints/:id/review-summary", analyticsHandler.ReviewSummary)
 	api.Get("/sprints/:id/review-summary/export", analyticsHandler.ExportReviewSummary)
 }
-
-// RegisterWorkItemRoutes mounts work-item CRUD under /api/v1.
-func RegisterWorkItemRoutes(api fiber.Router, workItemHandler *WorkItemHandler) {
-	api.Post("/work-items", workItemHandler.Create)
-	api.Get("/work-items", workItemHandler.List)
-	api.Get("/work-items/:id", workItemHandler.Get)
-	api.Put("/work-items/:id", workItemHandler.Update)
-	api.Delete("/work-items/:id", workItemHandler.Delete)
-}

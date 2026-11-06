@@ -82,9 +82,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	api := app.Group("/api/v1", authMiddleware)
-	http.RegisterWorkItemRoutes(api, http.NewWorkItemHandler(workItemService))
-	http.RegisterWorkItemWebSocket(app, gateway)
+	http.RegisterWorkItemWebSocket(app, gateway, authMiddleware)
 
 	if err := runtime.ListenAndServe(cfg, app); err != nil {
 		log.Fatal(err)
