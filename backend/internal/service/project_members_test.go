@@ -27,14 +27,13 @@ func projectWithTemplate(t *testing.T, templateID string) (*fakeDirectory, *serv
 	return dir, svc
 }
 
-func TestAddProjectMember_AppliesTemplateDefaultRole(t *testing.T) {
+func TestAddProjectMember_AddsPlainMemberWithoutProjectRole(t *testing.T) {
 	cases := []struct {
 		templateID  string
-		wantDefault domain.ProjectRole
 		wantCreator domain.ProjectRole
 	}{
-		{"se", "developer", "product_owner"},
-		{"general", "member", "owner"},
+		{"se", "product_owner"},
+		{"general", "owner"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.templateID, func(t *testing.T) {
@@ -47,7 +46,7 @@ func TestAddProjectMember_AppliesTemplateDefaultRole(t *testing.T) {
 
 			want := []domain.Member{
 				{UserID: "u1", Email: "u1@example.com", Name: "User u1", Role: tc.wantCreator},
-				{UserID: "u2", Email: "u2@example.com", Name: "User u2", Role: tc.wantDefault},
+				{UserID: "u2", Email: "u2@example.com", Name: "User u2"},
 			}
 			if !reflect.DeepEqual(got.Members, want) {
 				t.Fatalf("members = %+v, want %+v", got.Members, want)
@@ -188,7 +187,7 @@ func TestAddProjectMember_AddsByDirectoryUserID_NotEmail(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !slices.Contains(repo.log.calls, "AddMember(group-1,kc-pim-id,developer)") {
+	if !slices.Contains(repo.log.calls, "AddMember(group-1,kc-pim-id,)") {
 		t.Fatalf("calls = %v", repo.log.calls)
 	}
 }
@@ -266,6 +265,8 @@ func TestAssignProjectRole_ConcurrentDemotionOfLastTwoOwners_ExactlyOneSucceeds(
 			case err == nil:
 				succeeded++
 			case errors.Is(err, domain.ErrConflict):
+				conflicts++
+			case errors.Is(err, domain.ErrForbidden):
 				conflicts++
 			default:
 				t.Fatalf("unexpected error: %v", err)
@@ -374,7 +375,7 @@ func TestAssignProjectRole_ChangesMemberRole(t *testing.T) {
 
 func TestAssignProjectRole_RoleNotInTemplate_ReportsViolationOnRole(t *testing.T) {
 	for templateID, roles := range templateRoles {
-		for name, role := range map[string]domain.ProjectRole{"other template's role": roles.foreign, "unknown": "wizard", "empty": ""} {
+		for name, role := range map[string]domain.ProjectRole{"other template's role": roles.foreign, "unknown": "wizard"} {
 			t.Run(templateID+"/"+name, func(t *testing.T) {
 				_, svc := projectWithTemplate(t, templateID)
 
@@ -386,6 +387,143 @@ func TestAssignProjectRole_RoleNotInTemplate_ReportsViolationOnRole(t *testing.T
 				}
 			})
 		}
+	}
+}
+
+func TestAssignProjectRole_ClearsRoleButKeepsMembership(t *testing.T) {
+	dir, svc := projectWithTemplate(t, "se")
+	ctx := context.Background()
+	if _, err := svc.AddProjectMember(ctx, teamMember, seededProjectID, "u2@example.com"); err != nil {
+		t.Fatalf("seed add: %v", err)
+	}
+	if _, err := svc.AssignProjectRole(ctx, teamMember, seededProjectID, "u2", "developer"); err != nil {
+		t.Fatalf("seed role: %v", err)
+	}
+
+	got, err := svc.AssignProjectRole(ctx, teamMember, seededProjectID, "u2", "")
+	if err != nil {
+		t.Fatalf("clear role: %v", err)
+	}
+	member, exists := got.MemberByID("u2")
+	if !exists || member.Role != "" || len(dir.members["group-1"]) != 2 {
+		t.Fatalf("member after role clear = %+v, exists=%v, all=%+v", member, exists, dir.members["group-1"])
+	}
+}
+
+func TestMembershipMutations_RequireProjectOwner(t *testing.T) {
+	for _, action := range []struct {
+		name string
+		call func(*service.ProjectConfigurationService) error
+	}{
+		{
+			name: "add",
+			call: func(svc *service.ProjectConfigurationService) error {
+				_, err := svc.AddProjectMember(context.Background(), domain.Actor{
+					UserID: "u2", Email: "u2@example.com", Role: domain.SystemRoleTeamMember,
+				}, seededProjectID, "u1@example.com")
+				return err
+			},
+		},
+		{
+			name: "assign",
+			call: func(svc *service.ProjectConfigurationService) error {
+				_, err := svc.AssignProjectRole(context.Background(), domain.Actor{
+					UserID: "u2", Email: "u2@example.com", Role: domain.SystemRoleTeamMember,
+				}, seededProjectID, "u1", "scrum_master")
+				return err
+			},
+		},
+		{
+			name: "remove",
+			call: func(svc *service.ProjectConfigurationService) error {
+				_, err := svc.RemoveProjectMember(context.Background(), domain.Actor{
+					UserID: "u2", Email: "u2@example.com", Role: domain.SystemRoleTeamMember,
+				}, seededProjectID, "u1")
+				return err
+			},
+		},
+	} {
+		t.Run(action.name, func(t *testing.T) {
+			dir, svc := projectWithTemplate(t, "se")
+			ctx := context.Background()
+			if _, err := svc.AddProjectMember(ctx, teamMember, seededProjectID, "u2@example.com"); err != nil {
+				t.Fatalf("seed member: %v", err)
+			}
+
+			if err := action.call(svc); !errors.Is(err, domain.ErrForbidden) {
+				t.Fatalf("want owner-only ErrForbidden, got %v", err)
+			}
+			if len(dir.members["group-1"]) != 2 || dir.members["group-1"][0].Role != "product_owner" {
+				t.Fatalf("non-owner changed membership: %+v", dir.members["group-1"])
+			}
+		})
+	}
+}
+
+func TestRemoveProjectMember_RemovesMember(t *testing.T) {
+	dir, svc := projectWithTemplate(t, "se")
+	ctx := context.Background()
+	if _, err := svc.AddProjectMember(ctx, teamMember, seededProjectID, "u2@example.com"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	got, err := svc.RemoveProjectMember(ctx, teamMember, seededProjectID, "u2")
+	if err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	if _, exists := got.MemberByID("u2"); exists || len(dir.members["group-1"]) != 1 {
+		t.Fatalf("member still present: result=%+v directory=%+v", got.Members, dir.members["group-1"])
+	}
+}
+
+func TestRemoveProjectMember_OwnerCanRemoveSelfWhenAnotherOwnerRemains(t *testing.T) {
+	dir, svc := projectWithTemplate(t, "se")
+	ctx := context.Background()
+	if _, err := svc.AddProjectMember(ctx, teamMember, seededProjectID, "u2@example.com"); err != nil {
+		t.Fatalf("add second member: %v", err)
+	}
+	if _, err := svc.AssignProjectRole(ctx, teamMember, seededProjectID, "u2", "product_owner"); err != nil {
+		t.Fatalf("promote second owner: %v", err)
+	}
+
+	got, err := svc.RemoveProjectMember(ctx, teamMember, seededProjectID, teamMember.UserID)
+	if err != nil {
+		t.Fatalf("remove self: %v", err)
+	}
+	if _, exists := got.MemberByID(teamMember.UserID); exists {
+		t.Fatalf("removed owner is in response: %+v", got.Members)
+	}
+	if _, exists := got.MemberByID("u2"); !exists || len(dir.members["group-1"]) != 1 {
+		t.Fatalf("replacement owner not retained: response=%+v directory=%+v", got.Members, dir.members["group-1"])
+	}
+}
+
+func TestRemoveProjectMember_CannotRemoveLastOwner(t *testing.T) {
+	dir, svc := projectWithTemplate(t, "se")
+
+	_, err := svc.RemoveProjectMember(context.Background(), teamMember, seededProjectID, "u1")
+	if !errors.Is(err, domain.ErrConflict) {
+		t.Fatalf("want ErrConflict, got %v", err)
+	}
+	if len(dir.members["group-1"]) != 1 || dir.members["group-1"][0].Role != "product_owner" {
+		t.Fatalf("last owner changed: %+v", dir.members["group-1"])
+	}
+}
+
+func TestRemoveProjectMember_RejectsAuditorAndNonMember(t *testing.T) {
+	_, svc := projectWithTemplate(t, "se")
+	outsider := domain.Actor{UserID: "u9", Email: "u9@example.com", Role: domain.SystemRoleTeamMember}
+
+	for name, actor := range map[string]domain.Actor{"auditor": auditor, "non-member": outsider} {
+		t.Run(name, func(t *testing.T) {
+			_, err := svc.RemoveProjectMember(context.Background(), actor, seededProjectID, "u1")
+			if name == "auditor" && !errors.Is(err, domain.ErrForbidden) {
+				t.Fatalf("auditor error = %v, want forbidden", err)
+			}
+			if name == "non-member" && !errors.Is(err, domain.ErrNotProjectMember) {
+				t.Fatalf("non-member error = %v, want not project member", err)
+			}
+		})
 	}
 }
 

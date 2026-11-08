@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	mongorepo "github.com/RookieJoel/Chura/backend/internal/adapter/db/mongodb/repository"
 	memory "github.com/RookieJoel/Chura/backend/internal/adapter/db/postgres/repository"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/identity/keycloak"
@@ -34,9 +35,23 @@ func main() {
 		ClientSecret: cfg.KeycloakBackendClientSecret,
 	})
 
+	// Project deletion and template changes need the Work Item store, so Mongo
+	// is mandatory (config.Load already rejects a missing MONGODB_URI).
+	mongoConnections, err := runtime.ConnectMongo(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := mongoConnections.Close(); err != nil {
+			log.Printf("close mongo connections: %v", err)
+		}
+	}()
+
 	projectService := service.NewProjectConfigurationService(
 		memory.NewProjectRepository(connections.Postgres),
 		directory,
+		service.WithSprintStore(memory.NewSprintRepository(connections.Postgres)),
+		service.WithWorkItemStore(mongorepo.NewProjectWorkItemStore(mongoConnections.Mongo.Database)),
 	)
 
 	authMiddleware, err := runtime.AuthMiddleware(cfg)

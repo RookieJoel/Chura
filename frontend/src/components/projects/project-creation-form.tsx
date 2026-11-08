@@ -111,24 +111,30 @@ export function ProjectCreationForm() {
   };
 
   return (
-    <section className="mx-auto w-full max-w-2xl p-6">
+    <section className="fl-wash mx-auto w-full max-w-2xl p-6">
       <Link
         href="/backlog"
-        className="text-sm font-semibold text-brand hover:underline"
+        className="text-sm font-semibold text-brand-dark hover:underline"
       >
         Back to Projects
       </Link>
-      <h1 className="mb-2 mt-5 text-2xl font-bold text-text">Create Project</h1>
+      <span className="fl-accent-bar fl-accent-bar-sm mt-5 mb-3" aria-hidden />
+      <h1 className="mb-2 text-2xl font-light tracking-tight text-text">
+        Create Project
+      </h1>
       <p className="mb-6 text-sm text-text-secondary">
         Choose a template to set up this Project. You will be its initial owner.
       </p>
 
       <form
-        className="space-y-5 rounded-lg border border-border bg-surface p-5"
+        className="space-y-5 border border-border bg-surface/95 p-5"
         onSubmit={handleSubmit}
       >
         <div className="space-y-1.5">
-          <label htmlFor="project-name" className="text-sm font-semibold text-text">
+          <label
+            htmlFor="project-name"
+            className="text-[13px] font-medium tracking-wide text-text-secondary"
+          >
             Project name
           </label>
           <input
@@ -138,16 +144,17 @@ export function ProjectCreationForm() {
             maxLength={100}
             value={name}
             onChange={(event) => setName(event.target.value)}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-brand"
+            className="w-full border-0 border-b border-border bg-transparent px-0 py-2.5 text-sm text-text outline-none focus:border-brand"
           />
         </div>
 
         <div className="space-y-1.5">
           <label
             htmlFor="project-description"
-            className="text-sm font-semibold text-text"
+            className="text-[13px] font-medium tracking-wide text-text-secondary"
           >
-            Description <span className="font-normal text-text-tertiary">(optional)</span>
+            Description{" "}
+            <span className="font-normal text-text-tertiary">(optional)</span>
           </label>
           <textarea
             id="project-description"
@@ -156,14 +163,14 @@ export function ProjectCreationForm() {
             rows={4}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-brand"
+            className="w-full resize-y border-0 border-b border-border bg-transparent px-0 py-2.5 text-sm text-text outline-none focus:border-brand"
           />
         </div>
 
         <div className="space-y-1.5">
           <label
             htmlFor="project-template"
-            className="text-sm font-semibold text-text"
+            className="text-[13px] font-medium tracking-wide text-text-secondary"
           >
             Project template
           </label>
@@ -194,7 +201,7 @@ export function ProjectCreationForm() {
               required
               value={selectedTemplateId}
               onChange={(event) => void handleTemplateChange(event.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-brand"
+              className="w-full border-0 border-b border-border bg-transparent px-0 py-2.5 text-sm text-text outline-none focus:border-brand"
             >
               <option value="">Choose a template</option>
               {templates.map((template) => (
@@ -238,7 +245,7 @@ export function ProjectCreationForm() {
         <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
           <Link
             href="/backlog"
-            className="rounded-md px-3 py-2 text-sm font-semibold text-text-secondary hover:bg-background"
+            className="border border-border px-3 py-2 text-sm font-semibold text-text-secondary hover:border-accent hover:text-accent"
           >
             Cancel
           </Link>
@@ -252,7 +259,7 @@ export function ProjectCreationForm() {
               !selectedTemplate ||
               templateLoading
             }
-            className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="fl-cta px-5 py-2.5 text-sm"
           >
             {submitting ? "Creating…" : "Create Project"}
           </button>

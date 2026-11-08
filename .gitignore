@@ -15,3 +15,6 @@ backend/bin/
 features/
 CONTEXT.md
 progress.md
+
+# Local-only manual QA notes (do not push)
+frontend/MANUAL-TEST-CHECKLIST.md

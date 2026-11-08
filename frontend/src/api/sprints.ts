@@ -1,8 +1,6 @@
 import { apiRequest } from "@/api/client";
 import type { Sprint } from "@/types/work-item";
 
-const projectId = process.env.NEXT_PUBLIC_CHURA_PROJECT_ID;
-
 interface ApiSprint {
   id: string;
   project_id: string;
@@ -11,6 +9,12 @@ interface ApiSprint {
   start_date?: string;
   end_date?: string;
   status: Sprint["status"];
+}
+
+function requireProjectId(projectId: string | null | undefined): string {
+  const id = projectId?.trim();
+  if (!id) throw new Error("A Project must be selected");
+  return id;
 }
 
 function toDateInput(value?: string): string {
@@ -29,15 +33,16 @@ function toSprint(sprint: ApiSprint): Sprint {
   };
 }
 
-export async function listSprints(): Promise<Sprint[]> {
-  if (!projectId) throw new Error("NEXT_PUBLIC_CHURA_PROJECT_ID is not configured");
+export async function listSprints(projectId: string): Promise<Sprint[]> {
+  const id = requireProjectId(projectId);
   const sprints = await apiRequest<ApiSprint[]>(
-    `/sprints?project_id=${encodeURIComponent(projectId)}`,
+    `/sprints?project_id=${encodeURIComponent(id)}`,
   );
   return sprints.map(toSprint);
 }
 
 export interface CreateSprintInput {
+  projectId: string;
   name: string;
   team?: string;
   startDate?: string;
@@ -46,7 +51,7 @@ export interface CreateSprintInput {
 }
 
 export async function createSprint(input: CreateSprintInput): Promise<Sprint> {
-  if (!projectId) throw new Error("NEXT_PUBLIC_CHURA_PROJECT_ID is not configured");
+  const projectId = requireProjectId(input.projectId);
   if (!input.name.trim()) throw new Error("Sprint name is required");
   if (!input.team?.trim()) throw new Error("Team is required");
   const created = await apiRequest<ApiSprint>("/sprints", {
@@ -63,8 +68,8 @@ export async function createSprint(input: CreateSprintInput): Promise<Sprint> {
   return toSprint(created);
 }
 
-export async function getActiveSprint(): Promise<Sprint | null> {
-  const available = await listSprints();
+export async function getActiveSprint(projectId: string): Promise<Sprint | null> {
+  const available = await listSprints(projectId);
   return available.find((sprint) => sprint.status === "active") ?? null;
 }
 

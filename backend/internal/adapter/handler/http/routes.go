@@ -12,8 +12,17 @@ func RegisterProjectRoutes(api fiber.Router, templateHandler *TemplateHandler, p
 	api.Get("/projects", projectHandler.List)
 	api.Post("/projects", projectHandler.Create)
 	api.Get("/projects/:id", projectHandler.Get)
+	api.Patch("/projects/:id", projectHandler.Update)
+	api.Delete("/projects/:id", projectHandler.Delete)
 	api.Post("/projects/:id/members", projectHandler.AddMember)
 	api.Put("/projects/:id/members/:userId/role", projectHandler.AssignRole)
+	api.Delete("/projects/:id/members/:userId", projectHandler.RemoveMember)
+	api.Post("/projects/:id/auditors/me", projectHandler.SelfAssignAuditor)
+	api.Get("/projects/:id/auditors", projectHandler.ListAuditors)
+	api.Post("/projects/:id/auditors", projectHandler.AssignAuditor)
+	api.Get("/auditors", projectHandler.ListAuditorDirectory)
+	api.Get("/projects/:id/feedback", projectHandler.ListFeedback)
+	api.Post("/projects/:id/feedback", projectHandler.SubmitFeedback)
 	api.Post("/projects/:id/work-items/validate", projectHandler.ValidateWorkItem)
 
 	api.Get("/whoami", authHandler.WhoAmI)
@@ -36,4 +45,10 @@ func RegisterAnalyticsRoutes(api fiber.Router, analyticsHandler *AnalyticsHandle
 	api.Put("/sprints/:id/reflections/me", analyticsHandler.SubmitReflection)
 	api.Get("/sprints/:id/review-summary", analyticsHandler.ReviewSummary)
 	api.Get("/sprints/:id/review-summary/export", analyticsHandler.ExportReviewSummary)
+}
+
+// RegisterWorkItemCommentRoutes mounts Work Item comment REST under /api/v1.
+func RegisterWorkItemCommentRoutes(api fiber.Router, commentHandler *WorkItemCommentHandler) {
+	api.Get("/work-items/:id/comments", commentHandler.List)
+	api.Post("/work-items/:id/comments", commentHandler.Create)
 }

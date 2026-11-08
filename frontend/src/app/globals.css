@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f5f7;
-  --foreground: #172b4d;
+  --background: #f7f5fa;
+  --foreground: #1a1530;
+  --fl-angle: -35deg;
+  --fl-slant: -8deg;
+  --color-brand-ink: #b03a5f;
 }
 
 @theme inline {
@@ -11,15 +14,18 @@
   --font-sans: var(--font-sans);
 
   --color-surface: #ffffff;
-  --color-border: #dfe1e6;
-  --color-border-strong: #b7bac1;
-  --color-text: #172b4d;
-  --color-text-secondary: #5e6c84;
-  --color-text-tertiary: #7a869a;
+  --color-surface-muted: #efeaf5;
+  --color-border: #e4deec;
+  --color-border-strong: #cfc7dc;
+  --color-text: #1a1530;
+  --color-text-secondary: #6b6580;
+  --color-text-tertiary: #8a849c;
 
-  --color-brand: #0c66e4;
-  --color-brand-dark: #0747a6;
-  --color-brand-tint: #deebff;
+  --color-brand: #d9577d;
+  --color-brand-dark: #c2446a;
+  --color-brand-tint: #f8e8ee;
+  --color-accent: #5b4bdb;
+  --color-accent-tint: #ece9fb;
 
   --color-story: #12b76a;
   --color-story-tint: #e7f9ef;
@@ -43,10 +49,109 @@ body {
   color: var(--foreground);
 }
 
+/* Flowline primary CTA — cut corner + light sweep */
+.fl-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: var(--color-brand);
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - 12px),
+    calc(100% - 12px) 100%,
+    0 100%
+  );
+  transition: background-color 0.2s ease;
+}
+
+.fl-cta::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -40%;
+  width: 30%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.45),
+    transparent
+  );
+  transform: skewX(var(--fl-angle)) translateX(-120%);
+  transition: transform 0.7s ease;
+  pointer-events: none;
+}
+
+.fl-cta:hover:not(:disabled) {
+  background: var(--color-brand-dark);
+}
+
+.fl-cta:hover:not(:disabled)::before {
+  transform: skewX(var(--fl-angle)) translateX(520%);
+}
+
+.fl-cta:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-cta::before {
+    display: none;
+  }
+}
+
+/* Slanted pink → accent bar under titles */
+.fl-accent-bar {
+  display: block;
+  width: 48px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--color-brand),
+    var(--color-accent)
+  );
+  transform: rotate(var(--fl-angle));
+  transform-origin: left center;
+}
+
+.fl-accent-bar-sm {
+  width: 34px;
+}
+
+.fl-accent-bar-lg {
+  width: 72px;
+}
+
+/* Soft dual radial wash for accent surfaces */
+.fl-wash {
+  background-color: var(--color-surface);
+  background-image:
+    radial-gradient(
+      55% 55% at 18% 12%,
+      rgba(217, 87, 125, 0.14),
+      transparent 70%
+    ),
+    radial-gradient(
+      50% 50% at 88% 92%,
+      rgba(91, 75, 219, 0.1),
+      transparent 70%
+    );
+}
+
 .work-item-markdown h1,
 .work-item-markdown h2,
 .work-item-markdown h3 {
-  color: var(--text, #1b1e27);
+  color: var(--text, #1a1530);
   font-weight: 800;
   line-height: 1.25;
 }
@@ -108,6 +213,6 @@ body {
 }
 
 .work-item-markdown a {
-  color: var(--color-brand-dark);
+  color: var(--color-brand-ink);
   text-decoration: underline;
 }

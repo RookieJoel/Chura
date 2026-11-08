@@ -23,11 +23,20 @@ import (
 // implemented; any other call panics on the nil embedded value.
 type stubProjectService struct {
 	in.ProjectConfigurationService
-	createFn   func(domain.Actor, in.CreateProjectInput) (*domain.Project, error)
-	getFn      func(domain.Actor, string) (*domain.Project, error)
-	addFn      func(a domain.Actor, projectID, email string) (*domain.Project, error)
-	assignFn   func(a domain.Actor, projectID, userID string, role domain.ProjectRole) (*domain.Project, error)
-	validateFn func(a domain.Actor, projectID string, attrs domain.WorkItemAttributes) (domain.ValidationResult, error)
+	createFn         func(domain.Actor, in.CreateProjectInput) (*domain.Project, error)
+	getFn            func(domain.Actor, string) (*domain.Project, error)
+	addFn            func(a domain.Actor, projectID, email string) (*domain.Project, error)
+	assignFn         func(a domain.Actor, projectID, userID string, role domain.ProjectRole) (*domain.Project, error)
+	removeFn         func(a domain.Actor, projectID, userID string) (*domain.Project, error)
+	validateFn       func(a domain.Actor, projectID string, attrs domain.WorkItemAttributes) (domain.ValidationResult, error)
+	selfAssignFn     func(domain.Actor, string) (domain.ProjectAuditorAssignment, error)
+	listAuditorsFn   func(domain.Actor, string) ([]domain.ProjectAuditorAssignment, error)
+	assignAuditorFn  func(a domain.Actor, projectID, auditorUserID string) (domain.ProjectAuditorAssignment, error)
+	auditorDirFn     func(domain.Actor) ([]domain.DirectoryUser, error)
+	submitFeedbackFn func(domain.Actor, string, string) (domain.ProjectFeedback, error)
+	listFeedbackFn   func(domain.Actor, string) ([]domain.ProjectFeedback, error)
+	updateFn         func(domain.Actor, string, in.UpdateProjectInput) (*domain.Project, error)
+	deleteFn         func(domain.Actor, string) error
 }
 
 func (s stubProjectService) AddProjectMember(_ context.Context, a domain.Actor, projectID, email string) (*domain.Project, error) {
@@ -36,6 +45,10 @@ func (s stubProjectService) AddProjectMember(_ context.Context, a domain.Actor, 
 
 func (s stubProjectService) AssignProjectRole(_ context.Context, a domain.Actor, projectID, userID string, role domain.ProjectRole) (*domain.Project, error) {
 	return s.assignFn(a, projectID, userID, role)
+}
+
+func (s stubProjectService) RemoveProjectMember(_ context.Context, a domain.Actor, projectID, userID string) (*domain.Project, error) {
+	return s.removeFn(a, projectID, userID)
 }
 
 func (s stubProjectService) CreateProjectBoard(_ context.Context, a domain.Actor, i in.CreateProjectInput) (*domain.Project, error) {
@@ -48,6 +61,38 @@ func (s stubProjectService) RetrieveProjectData(_ context.Context, a domain.Acto
 
 func (s stubProjectService) ValidateWorkItemAttributes(_ context.Context, a domain.Actor, projectID string, attrs domain.WorkItemAttributes) (domain.ValidationResult, error) {
 	return s.validateFn(a, projectID, attrs)
+}
+
+func (s stubProjectService) SelfAssignAuditor(_ context.Context, a domain.Actor, projectID string) (domain.ProjectAuditorAssignment, error) {
+	return s.selfAssignFn(a, projectID)
+}
+
+func (s stubProjectService) ListProjectAuditors(_ context.Context, a domain.Actor, projectID string) ([]domain.ProjectAuditorAssignment, error) {
+	return s.listAuditorsFn(a, projectID)
+}
+
+func (s stubProjectService) AssignProjectAuditor(_ context.Context, a domain.Actor, projectID, auditorUserID string) (domain.ProjectAuditorAssignment, error) {
+	return s.assignAuditorFn(a, projectID, auditorUserID)
+}
+
+func (s stubProjectService) ListAuditorDirectory(_ context.Context, a domain.Actor) ([]domain.DirectoryUser, error) {
+	return s.auditorDirFn(a)
+}
+
+func (s stubProjectService) SubmitProjectFeedback(_ context.Context, a domain.Actor, projectID, body string) (domain.ProjectFeedback, error) {
+	return s.submitFeedbackFn(a, projectID, body)
+}
+
+func (s stubProjectService) ListProjectFeedback(_ context.Context, a domain.Actor, projectID string) ([]domain.ProjectFeedback, error) {
+	return s.listFeedbackFn(a, projectID)
+}
+
+func (s stubProjectService) UpdateProject(_ context.Context, a domain.Actor, projectID string, input in.UpdateProjectInput) (*domain.Project, error) {
+	return s.updateFn(a, projectID, input)
+}
+
+func (s stubProjectService) DeleteProject(_ context.Context, a domain.Actor, projectID string) error {
+	return s.deleteFn(a, projectID)
 }
 
 func projectApp(svc in.ProjectConfigurationService) *fiber.App {

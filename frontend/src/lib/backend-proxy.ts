@@ -2,10 +2,12 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import { sessionCookieName } from "../../auth";
 
+const NULL_BODY_STATUSES = new Set([204, 205, 304]);
+
 async function proxyBackendRequest(
   request: Request,
   path: string,
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
 ) {
   const token = await getToken({
     req: request,
@@ -33,8 +35,8 @@ async function proxyBackendRequest(
       Authorization: `Bearer ${accessToken}`,
     });
     const body =
-      method === "POST" ? await request.arrayBuffer() : undefined;
-    if (method === "POST") {
+      method === "GET" ? undefined : await request.arrayBuffer();
+    if (method !== "GET") {
       headers.set(
         "content-type",
         request.headers.get("content-type") ?? "application/json",
@@ -46,6 +48,11 @@ async function proxyBackendRequest(
       body: body && body.byteLength > 0 ? body : undefined,
       cache: "no-store",
     });
+    // Null-body statuses (204 No Content, 205, 304) must not carry a body:
+    // the Response constructor throws on one, even an empty string.
+    if (NULL_BODY_STATUSES.has(response.status)) {
+      return new NextResponse(null, { status: response.status });
+    }
     return new NextResponse(await response.text(), {
       status: response.status,
       headers: {
@@ -67,4 +74,16 @@ export function proxyBackendGet(request: Request, path: string) {
 
 export function proxyBackendPost(request: Request, path: string) {
   return proxyBackendRequest(request, path, "POST");
+}
+
+export function proxyBackendPut(request: Request, path: string) {
+  return proxyBackendRequest(request, path, "PUT");
+}
+
+export function proxyBackendPatch(request: Request, path: string) {
+  return proxyBackendRequest(request, path, "PATCH");
+}
+
+export function proxyBackendDelete(request: Request, path: string) {
+  return proxyBackendRequest(request, path, "DELETE");
 }

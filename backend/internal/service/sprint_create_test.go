@@ -20,7 +20,7 @@ var memberActor = domain.Actor{UserID: "u1", Email: "u1@example.com", Role: doma
 func TestCreateSprint_PersistsSprintWithProjectID(t *testing.T) {
 	repo := &fakeSprintRepo{}
 	gw := &fakeGateway{project: &domain.Project{ID: sprintProjectID, Mode: domain.ModeSE}}
-	svc := service.NewSprintService(repo, gw)
+	svc := service.NewSprintService(repo, gw, &fakeSprintWorkItems{})
 
 	got, err := svc.CreateSprint(context.Background(), memberActor,
 		&domain.Sprint{ProjectID: sprintProjectID, Name: "Sprint 1", Team: "Alpha"})
@@ -42,7 +42,7 @@ func TestCreateSprint_PersistsSprintWithProjectID(t *testing.T) {
 func TestCreateSprint_AuditorIsForbiddenAndGatewayNotCalled(t *testing.T) {
 	repo := &fakeSprintRepo{}
 	gw := &fakeGateway{project: &domain.Project{ID: sprintProjectID}}
-	svc := service.NewSprintService(repo, gw)
+	svc := service.NewSprintService(repo, gw, &fakeSprintWorkItems{})
 	auditor := domain.Actor{UserID: "a1", Email: "a1@example.com", Role: domain.SystemRoleAuditor}
 
 	_, err := svc.CreateSprint(context.Background(), auditor,
@@ -59,7 +59,7 @@ func TestCreateSprint_AuditorIsForbiddenAndGatewayNotCalled(t *testing.T) {
 func TestCreateSprint_RejectsUnauthenticatedActor(t *testing.T) {
 	repo := &fakeSprintRepo{}
 	gw := &fakeGateway{}
-	svc := service.NewSprintService(repo, gw)
+	svc := service.NewSprintService(repo, gw, &fakeSprintWorkItems{})
 
 	_, err := svc.CreateSprint(context.Background(), domain.Actor{},
 		&domain.Sprint{ProjectID: sprintProjectID, Name: "Sprint 1", Team: "Alpha"})
@@ -75,7 +75,7 @@ func TestCreateSprint_RejectsUnauthenticatedActor(t *testing.T) {
 func TestCreateSprint_BlankProjectIDIsInvalidInputWithViolation(t *testing.T) {
 	repo := &fakeSprintRepo{}
 	gw := &fakeGateway{}
-	svc := service.NewSprintService(repo, gw)
+	svc := service.NewSprintService(repo, gw, &fakeSprintWorkItems{})
 
 	_, err := svc.CreateSprint(context.Background(), memberActor,
 		&domain.Sprint{ProjectID: "  ", Name: "Sprint 1", Team: "Alpha"})
@@ -95,7 +95,7 @@ func TestCreateSprint_BlankProjectIDIsInvalidInputWithViolation(t *testing.T) {
 func TestCreateSprint_NonUUIDProjectIDIsInvalidID(t *testing.T) {
 	repo := &fakeSprintRepo{}
 	gw := &fakeGateway{}
-	svc := service.NewSprintService(repo, gw)
+	svc := service.NewSprintService(repo, gw, &fakeSprintWorkItems{})
 
 	_, err := svc.CreateSprint(context.Background(), memberActor,
 		&domain.Sprint{ProjectID: "not-a-uuid", Name: "Sprint 1", Team: "Alpha"})
@@ -111,7 +111,7 @@ func TestCreateSprint_NonUUIDProjectIDIsInvalidID(t *testing.T) {
 func TestCreateSprint_UnknownProjectIsNotFound(t *testing.T) {
 	repo := &fakeSprintRepo{}
 	gw := &fakeGateway{err: fmt.Errorf("project %s: %w", sprintProjectID, domain.ErrNotFound)}
-	svc := service.NewSprintService(repo, gw)
+	svc := service.NewSprintService(repo, gw, &fakeSprintWorkItems{})
 
 	_, err := svc.CreateSprint(context.Background(), memberActor,
 		&domain.Sprint{ProjectID: sprintProjectID, Name: "Sprint 1", Team: "Alpha"})
@@ -127,7 +127,7 @@ func TestCreateSprint_UnknownProjectIsNotFound(t *testing.T) {
 func TestCreateSprint_OutsiderProjectIsNotProjectMember(t *testing.T) {
 	repo := &fakeSprintRepo{}
 	gw := &fakeGateway{err: fmt.Errorf("project %s: %w", sprintProjectID, domain.ErrNotProjectMember)}
-	svc := service.NewSprintService(repo, gw)
+	svc := service.NewSprintService(repo, gw, &fakeSprintWorkItems{})
 
 	_, err := svc.CreateSprint(context.Background(), memberActor,
 		&domain.Sprint{ProjectID: sprintProjectID, Name: "Sprint 1", Team: "Alpha"})
@@ -163,7 +163,7 @@ func TestCreateSprint_InvalidSprintIsInvalidInputAndNotPersisted(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := &fakeSprintRepo{}
 			gw := &fakeGateway{project: &domain.Project{ID: sprintProjectID}}
-			svc := service.NewSprintService(repo, gw)
+			svc := service.NewSprintService(repo, gw, &fakeSprintWorkItems{})
 
 			_, err := svc.CreateSprint(context.Background(), memberActor, &tc.sprint)
 
@@ -181,7 +181,7 @@ func TestCreateSprint_InvalidSprintIsInvalidInputAndNotPersisted(t *testing.T) {
 func TestCreateSprint_GeneralModeProjectIsAllowed(t *testing.T) {
 	repo := &fakeSprintRepo{}
 	gw := &fakeGateway{project: &domain.Project{ID: sprintProjectID, Mode: domain.ModeGeneral}}
-	svc := service.NewSprintService(repo, gw)
+	svc := service.NewSprintService(repo, gw, &fakeSprintWorkItems{})
 
 	got, err := svc.CreateSprint(context.Background(), memberActor,
 		&domain.Sprint{ProjectID: sprintProjectID, Name: "Sprint 1", Team: "Alpha"})

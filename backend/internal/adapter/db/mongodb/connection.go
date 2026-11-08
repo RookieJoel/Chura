@@ -14,6 +14,7 @@ type Connection struct {
 	Client              *mongo.Client
 	Database            *mongo.Database
 	WorkItemsrepository out.WorkItemRepository
+	WorkItemComments    out.WorkItemCommentRepository
 	SprintWorkItems     out.SprintWorkItemReader
 }
 
@@ -34,15 +35,22 @@ func Connect(uri, databaseName string) (*Connection, error) {
 		_ = client.Disconnect(ctx)
 		return nil, err
 	}
-	workItemRepository := repository.NewWorkItemRepository(client.Database(databaseName))
+	database := client.Database(databaseName)
+	workItemRepository := repository.NewWorkItemRepository(database)
 	if err := workItemRepository.EnsureIndexes(); err != nil {
+		_ = client.Disconnect(ctx)
+		return nil, err
+	}
+	commentRepository := repository.NewWorkItemCommentRepository(database)
+	if err := commentRepository.EnsureIndexes(); err != nil {
 		_ = client.Disconnect(ctx)
 		return nil, err
 	}
 	return &Connection{
 		Client:              client,
-		Database:            client.Database(databaseName),
+		Database:            database,
 		WorkItemsrepository: workItemRepository,
+		WorkItemComments:    commentRepository,
 		SprintWorkItems:     workItemRepository,
 	}, nil
 }

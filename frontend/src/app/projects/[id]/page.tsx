@@ -8,7 +8,7 @@ export default async function ProjectPage({
 }) {
   const { id } = await params;
   return (
-    <AppShell minimal>
+    <AppShell>
       <ProjectOverview projectId={id} />
     </AppShell>
   );

@@ -7,6 +7,7 @@ import { PointsBadge } from "@/components/work-items/points-badge";
 import { EpicPill } from "@/components/work-items/epic-pill";
 import { BlockedBadge } from "@/components/work-items/blocked-badge";
 import { WorkItemAvatar } from "@/components/work-items/avatar";
+import { STATUS_LABELS, STATUS_ORDER } from "@/lib/work-item-utils";
 import { cn } from "@/lib/cn";
 
 interface WorkItemCardProps {
@@ -33,7 +34,7 @@ export function WorkItemCard({
     <Link
       href={`/work-items/${item.id}`}
       className={cn(
-        "flex flex-col gap-2 rounded-md border border-border bg-surface p-3 shadow-[0_1px_2px_rgba(9,30,66,0.12)] transition-all hover:border-brand hover:shadow-[0_3px_8px_rgba(9,30,66,0.16)]",
+        "flex flex-col gap-2 rounded-sm border border-border bg-surface p-3 shadow-[0_1px_2px_rgba(26,21,48,0.1)] transition-all hover:border-brand hover:shadow-[0_3px_8px_rgba(217,87,125,0.16)]",
         item.status === "done" && "opacity-90",
         className,
       )}
@@ -73,10 +74,11 @@ export function WorkItemCard({
               onChange={handleStatusChange}
               className="max-w-[108px] rounded-md border border-border bg-background px-1.5 py-1 text-[10px] font-semibold text-text-secondary outline-none focus:border-brand disabled:opacity-50"
             >
-              <option value="todo">To do</option>
-              <option value="in_progress">In Progress</option>
-              <option value="review">Review</option>
-              <option value="done">Done</option>
+              {STATUS_ORDER.map((status) => (
+                <option key={status} value={status}>
+                  {STATUS_LABELS[status]}
+                </option>
+              ))}
             </select>
           )}
           <PointsBadge points={item.storyPoints} />

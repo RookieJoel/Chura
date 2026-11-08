@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getToken } from "next-auth/jwt";
-import { proxyBackendPost } from "@/lib/backend-proxy";
+import { proxyBackendDelete, proxyBackendPost } from "@/lib/backend-proxy";
 
 vi.mock("next-auth/jwt", () => ({ getToken: vi.fn() }));
 vi.mock("../../auth", () => ({ sessionCookieName: "authjs.session-token" }));
@@ -58,5 +58,30 @@ describe("proxyBackendPost", () => {
     expect(init.cache).toBe("no-store");
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "name is required" });
+  });
+});
+
+describe("proxyBackendDelete", () => {
+  beforeEach(() => {
+    process.env.CHURA_API_URL = "http://backend.test";
+    process.env.AUTH_SECRET = "test-secret";
+    vi.mocked(getToken).mockReset();
+    vi.unstubAllGlobals();
+  });
+
+  it("passes a 204 No Content through instead of reporting the backend unavailable", async () => {
+    vi.mocked(getToken).mockResolvedValue({ accessToken: "test-access-token" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
+    );
+    const request = new Request("http://localhost/api/v1/projects/p1", {
+      method: "DELETE",
+    });
+
+    const response = await proxyBackendDelete(request, "/api/v1/projects/p1");
+
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe("");
   });
 });

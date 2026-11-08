@@ -2,8 +2,35 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTemplate, listTemplates } from "@/api/templates";
 
 const templates = [
-  { id: "general", name: "General", mode: "general", creator_role: "owner" },
-  { id: "se", name: "Software Engineering", mode: "se", creator_role: "product_owner" },
+  {
+    id: "general",
+    name: "General",
+    mode: "general",
+    work_item_types: ["task"],
+    roles: ["owner", "member"],
+    default_role: "member",
+    creator_role: "owner",
+  },
+  {
+    id: "se",
+    name: "Software Engineering",
+    mode: "se",
+    work_item_types: ["user_story", "task", "bug"],
+    roles: ["product_owner", "scrum_master", "developer"],
+    default_role: "developer",
+    creator_role: "product_owner",
+    validation_rules: {
+      required_fields: ["title"],
+      story_points: { greater_than: 0 },
+      type_rules: [
+        {
+          type: "user_story",
+          description_format: "user_story",
+          require_acceptance_criteria: true,
+        },
+      ],
+    },
+  },
 ];
 
 describe("template API", () => {
@@ -53,7 +80,9 @@ describe("template API", () => {
         ),
     );
 
-    await expect(listTemplates()).rejects.toThrow("Unauthenticated (401)");
+    await expect(listTemplates()).rejects.toThrow(
+      "Your session has expired. Please sign in again to continue.",
+    );
     await expect(listTemplates()).rejects.toThrow("Invalid template list response");
   });
 });

@@ -38,7 +38,8 @@ docker compose -f deploy/docker-compose.yml up -d --build
 
 The Kong API gateway is available at
 [http://localhost:8083](http://localhost:8083) (routes to project/sprint/analytics/workitem via Consul), and the WorkItem WebSocket is
-available at `ws://127.0.0.1:8083/ws/work-items`.
+available at `ws://127.0.0.1:8083/ws/work-items` (use `127.0.0.1`, not
+`localhost`, so Auth.js cookies are not sent and Kong does not return 431).
 
 ### 3. Start the frontend
 
@@ -88,16 +89,17 @@ KEYCLOAK_ISSUER=http://localhost:8080/realms/chura
 KEYCLOAK_CLIENT_ID=chura-auth-client
 KEYCLOAK_CLIENT_SECRET=
 CHURA_API_URL=http://localhost:8083
-NEXT_PUBLIC_CHURA_PROJECT_ID=<project UUID>
 NEXT_PUBLIC_WORK_ITEM_RPC_URL=ws://127.0.0.1:8083/ws/work-items
-# Optional; defaults to the Postgres seed project (make seed-dev)
+# Optional seed Project UUID for local fixtures; Board/Backlog/Sprints use the selected Project
 NEXT_PUBLIC_CHURA_PROJECT_ID=11111111-1111-4111-8111-111111111111
 ```
 
-Backlog work items use the seeded dev project id
-(`11111111-1111-4111-8111-111111111111`) from
-`backend/scripts/seed/dev_project.sql`. Run `make migrate` then `make seed-dev`
-(`make setup` runs both).
+Board, Backlog, and Sprints use the **selected Project** from the top-nav
+selector (not the seed env id for normal use). Run `make migrate` then
+`make seed-dev` (`make setup` runs both) if you want the seeded Project,
+sprints, sample work items, and Keycloak membership for `tonnam` / `pim`.
+A Sprint cannot start with zero Work Items (backend 400); ending a Sprint
+does not auto-move unfinished items to the Backlog.
 
 `KEYCLOAK_CLIENT_SECRET` remains empty for the imported public Keycloak client.
 Every frontend page requires a Keycloak session. After login, the server
@@ -105,8 +107,12 @@ forwards the session's access token to `/api/v1/whoami`; the verified ID,
 email, and roles are available from the profile menu in the top navigation.
 Sprint requests go through the Next.js `/api/backend/*` proxy. WorkItem CRUD
 uses the authenticated `/ws/work-items` WebSocket; the Next.js `/api/ws-token`
-route bridges the Auth.js session to the backend bearer-token handshake using
-the negotiated `chura-auth` WebSocket subprotocol.
+route bridges the Auth.js session to the backend. The JWT is sent in the
+`Sec-WebSocket-Protocol` header as `auth.<token>` (with `chura-auth` for
+negotiation) — not as a query parameter, which makes Kong return HTTP 431.
+Board status changes use that same request/response WebSocket path (open →
+send one op → close). **Deferred:** drag-and-drop column moves and live
+multi-user board sync; the client does not keep a long-lived subscription.
 
 Unauthenticated requests are sent to the `/login` server page. That page calls
 `signIn("keycloak", { redirectTo })` directly, so Auth.js starts the Keycloak

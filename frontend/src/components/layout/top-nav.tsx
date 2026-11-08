@@ -1,16 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { members } from "@/lib/mock-data";
-import { BellIcon, SearchIcon } from "@/components/icons";
+import { usePathname } from "next/navigation";
 import { WorkItemAvatar } from "@/components/work-items/avatar";
 import { ProfileMenu } from "@/components/layout/profile-menu";
 import { useProjects } from "@/components/layout/project-provider";
 
+function isProjectSettingsPath(pathname: string) {
+  return /^\/projects\/(?!new(?:\/|$))[^/]+/.test(pathname);
+}
+
 export function TopNav({ minimal = false }: { minimal?: boolean }) {
+  const pathname = usePathname();
   const {
     projects,
     selectedProjectId,
+    selectedProject: projectDetails,
+    selectedProjectLoadState,
+    selectedProjectError,
     selectProject,
     loadState,
     error,
@@ -19,28 +26,38 @@ export function TopNav({ minimal = false }: { minimal?: boolean }) {
   const selectedProject = projects.find(
     (project) => project.id === selectedProjectId,
   );
+  const projectSwitchLocked = isProjectSettingsPath(pathname);
+  const selectorDisabled =
+    projectSwitchLocked || loadState !== "ready" || projects.length === 0;
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-5">
-      <div className="flex items-center gap-3.5">
-        <Link href="/board" className="flex items-center gap-2">
-          <div className="flex size-[28px] items-center justify-center rounded-md bg-brand text-sm font-extrabold text-white shadow-sm">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-6">
+      <div className="flex items-center gap-4">
+        <Link href="/board" className="flex items-center gap-2.5">
+          <div className="flex size-9 items-center justify-center bg-brand text-base font-bold text-white">
             C
           </div>
-          <span className="text-[15px] font-bold tracking-tight text-text">
+          <span className="text-base font-semibold tracking-tight text-text">
             Chura
           </span>
         </Link>
-        <div className="h-5 w-px bg-border" />
-        <label className="flex items-center gap-1.5 text-[13px] font-semibold text-text-secondary">
-          <div className="flex size-[18px] items-center justify-center rounded-[5px] bg-task-tint text-[10px] font-extrabold text-task">
+        <div className="h-6 w-px bg-border" />
+        <label
+          className="flex items-center gap-2 text-sm font-medium text-text-secondary"
+          title={
+            projectSwitchLocked
+              ? "Leave this Project page to switch Projects"
+              : undefined
+          }
+        >
+          <div className="flex size-6 items-center justify-center bg-accent-tint text-[11px] font-bold text-accent">
             {selectedProject?.name.slice(0, 2).toUpperCase() ?? "P"}
           </div>
           <select
             aria-label="Project"
-            className="max-w-48 truncate bg-transparent outline-none"
+            className="max-w-56 truncate bg-transparent text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
             value={selectedProjectId ?? ""}
-            disabled={loadState !== "ready" || projects.length === 0}
+            disabled={selectorDisabled}
             onChange={(event) => selectProject(event.target.value)}
           >
             {projects.length === 0 ? (
@@ -60,7 +77,7 @@ export function TopNav({ minimal = false }: { minimal?: boolean }) {
         </label>
         <Link
           href="/projects/new"
-          className="rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-text-secondary hover:bg-background hover:text-text"
+          className="border border-border px-3 py-2 text-sm font-semibold text-text-secondary hover:border-accent hover:text-accent"
         >
           Create Project
         </Link>
@@ -87,23 +104,36 @@ export function TopNav({ minimal = false }: { minimal?: boolean }) {
       </div>
       <div className="flex items-center gap-4">
         {!minimal && (
-          <>
-            <div className="flex w-[240px] items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-text-tertiary transition-colors focus-within:border-brand">
-              <SearchIcon className="size-3.5" />
-              <span className="text-[12.5px]">Search work items</span>
-            </div>
-            <div className="flex items-center">
-              {members.map((member, index) => (
-                <WorkItemAvatar
-                  key={member.id}
-                  member={member}
-                  size="lg"
-                  className={`border-2 border-surface ${index < members.length - 1 ? "-mr-2" : ""}`}
-                />
+          <div
+            aria-label="Project members"
+            className="flex max-w-56 items-center gap-2 text-xs text-text-tertiary"
+          >
+            {selectedProjectLoadState === "loading" && (
+              <span role="status">Loading Project members…</span>
+            )}
+            {selectedProjectLoadState === "error" && (
+              <span role="alert" className="text-red-600">
+                {selectedProjectError ?? "Unable to load Project members"}
+              </span>
+            )}
+            {selectedProjectLoadState === "ready" &&
+              (projectDetails?.id === selectedProjectId ? (
+                projectDetails.members.length > 0 ? (
+                  projectDetails.members.map((member, index, visibleMembers) => (
+                    <WorkItemAvatar
+                      key={member.id}
+                      member={member}
+                      size="lg"
+                      className={`border-2 border-surface ${index < visibleMembers.length - 1 ? "-mr-2" : ""}`}
+                    />
+                  ))
+                ) : (
+                  <span>No Project members</span>
+                )
+              ) : (
+                <span>Select a Project to view members</span>
               ))}
-            </div>
-            <BellIcon className="size-4 text-text-secondary" />
-          </>
+          </div>
         )}
         <ProfileMenu />
       </div>

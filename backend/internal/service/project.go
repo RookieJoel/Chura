@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -19,6 +20,8 @@ import (
 type ProjectConfigurationService struct {
 	repo      out.ProjectRepository
 	directory out.ProjectDirectory
+	sprints   out.ProjectSprintStore
+	workItems out.ProjectWorkItemStore
 	newID     func() string
 	now       func() time.Time
 }
@@ -37,6 +40,14 @@ func WithIDGenerator(newID func() string) ProjectOption {
 
 func WithClock(now func() time.Time) ProjectOption {
 	return func(s *ProjectConfigurationService) { s.now = now }
+}
+
+func WithSprintStore(store out.ProjectSprintStore) ProjectOption {
+	return func(s *ProjectConfigurationService) { s.sprints = store }
+}
+
+func WithWorkItemStore(store out.ProjectWorkItemStore) ProjectOption {
+	return func(s *ProjectConfigurationService) { s.workItems = store }
 }
 
 func NewProjectConfigurationService(repo out.ProjectRepository, directory out.ProjectDirectory, opts ...ProjectOption) *ProjectConfigurationService {
@@ -163,7 +174,7 @@ func (s *ProjectConfigurationService) undoCreate(ctx context.Context, project *d
 }
 
 func (s *ProjectConfigurationService) AddProjectMember(ctx context.Context, actor domain.Actor, projectID, email string) (*domain.Project, error) {
-	project, err := s.loadMutable(ctx, actor, projectID)
+	project, template, err := s.loadOwnerMutable(ctx, actor, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("add project member: %w", err)
 	}
@@ -172,10 +183,6 @@ func (s *ProjectConfigurationService) AddProjectMember(ctx context.Context, acto
 		return nil, fmt.Errorf("add project member: %w", &domain.InvalidInputError{Violations: []domain.Violation{
 			{Field: "email", Message: fmt.Sprintf("email is required, must contain @ and be at most %d characters", domain.MaxEmailRunes)},
 		}})
-	}
-	template, err := templateOf(project)
-	if err != nil {
-		return nil, fmt.Errorf("add project member: %w", err)
 	}
 	user, err := s.directory.FindUserByEmail(ctx, email)
 	if err != nil {
@@ -190,10 +197,13 @@ func (s *ProjectConfigurationService) AddProjectMember(ctx context.Context, acto
 		if err := s.refreshMembers(ctx, project); err != nil {
 			return err
 		}
+		if err := requireProjectOwner(actor, project, template); err != nil {
+			return err
+		}
 		if _, isMember := project.MemberByID(user.ID); isMember {
 			return fmt.Errorf("user %q is already a member: %w", user.ID, domain.ErrAlreadyMember)
 		}
-		return s.directory.AddMember(ctx, project.GroupID, project.ID, user.ID, template.DefaultRole)
+		return s.directory.AddMember(ctx, project.GroupID, project.ID, user.ID, "")
 	})
 	if err != nil {
 		return nil, fmt.Errorf("add project member: %w", err)
@@ -202,15 +212,11 @@ func (s *ProjectConfigurationService) AddProjectMember(ctx context.Context, acto
 }
 
 func (s *ProjectConfigurationService) AssignProjectRole(ctx context.Context, actor domain.Actor, projectID, userID string, role domain.ProjectRole) (*domain.Project, error) {
-	project, err := s.loadMutable(ctx, actor, projectID)
+	project, template, err := s.loadOwnerMutable(ctx, actor, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("assign project role: %w", err)
 	}
-	template, err := templateOf(project)
-	if err != nil {
-		return nil, fmt.Errorf("assign project role: %w", err)
-	}
-	if !slices.Contains(template.Roles, role) {
+	if role != "" && !slices.Contains(template.Roles, role) {
 		return nil, fmt.Errorf("assign project role: %w", &domain.InvalidInputError{Violations: []domain.Violation{
 			{Field: "role", Message: fmt.Sprintf("role must be one of %v", template.Roles)},
 		}})
@@ -220,6 +226,9 @@ func (s *ProjectConfigurationService) AssignProjectRole(ctx context.Context, act
 		if err := s.refreshMembers(ctx, project); err != nil {
 			return err
 		}
+		if err := requireProjectOwner(actor, project, template); err != nil {
+			return err
+		}
 		if err := keepCreatorRoleGuard(userID, role, template.CreatorRole)(project.Members); err != nil {
 			return err
 		}
@@ -227,6 +236,46 @@ func (s *ProjectConfigurationService) AssignProjectRole(ctx context.Context, act
 	})
 	if err != nil {
 		return nil, fmt.Errorf("assign project role: %w", err)
+	}
+	return s.loadVisible(ctx, actor, project.ID)
+}
+
+func (s *ProjectConfigurationService) RemoveProjectMember(ctx context.Context, actor domain.Actor, projectID, userID string) (*domain.Project, error) {
+	project, template, err := s.loadOwnerMutable(ctx, actor, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("remove project member: %w", err)
+	}
+	userID = strings.TrimSpace(userID)
+	if userID == "" || utf8.RuneCountInString(userID) > domain.MaxUserIDRunes {
+		return nil, fmt.Errorf("remove project member: %w", domain.ErrInvalidInput)
+	}
+	err = s.repo.WithMembershipLock(ctx, project.ID, func(ctx context.Context) error {
+		if err := s.refreshMembers(ctx, project); err != nil {
+			return err
+		}
+		if err := requireProjectOwner(actor, project, template); err != nil {
+			return err
+		}
+		member, exists := project.MemberByID(userID)
+		if !exists {
+			return fmt.Errorf("user %q is not a member: %w", userID, domain.ErrNotFound)
+		}
+		if member.Role == template.CreatorRole && project.CountRole(template.CreatorRole) == 1 {
+			return fmt.Errorf("project must keep a %s: %w", template.CreatorRole, domain.ErrConflict)
+		}
+		if err := s.directory.RemoveMember(ctx, project.GroupID, project.ID, userID); err != nil {
+			return err
+		}
+		project.Members = slices.DeleteFunc(project.Members, func(member domain.Member) bool {
+			return member.UserID == userID
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("remove project member: %w", err)
+	}
+	if actor.UserID == userID {
+		return project, nil
 	}
 	return s.loadVisible(ctx, actor, project.ID)
 }
@@ -264,6 +313,10 @@ func (s *ProjectConfigurationService) RetrieveProjectData(ctx context.Context, a
 		return nil, fmt.Errorf("retrieve project data: %w", err)
 	}
 	return project, nil
+}
+
+func (s *ProjectConfigurationService) IsAuditorAssigned(ctx context.Context, projectID, auditorUserID string) (bool, error) {
+	return s.repo.IsAuditorAssigned(ctx, projectID, auditorUserID)
 }
 
 // loadVisible loads a project the actor may see: validated actor, well-formed
@@ -305,6 +358,32 @@ func (s *ProjectConfigurationService) loadMutable(ctx context.Context, actor dom
 	return project, nil
 }
 
+func (s *ProjectConfigurationService) loadOwnerMutable(ctx context.Context, actor domain.Actor, projectID string) (*domain.Project, domain.Template, error) {
+	project, err := s.loadMutable(ctx, actor, projectID)
+	if err != nil {
+		return nil, domain.Template{}, err
+	}
+	template, err := templateOf(project)
+	if err != nil {
+		return nil, domain.Template{}, err
+	}
+	if err := requireProjectOwner(actor, project, template); err != nil {
+		return nil, domain.Template{}, err
+	}
+	return project, template, nil
+}
+
+func requireProjectOwner(actor domain.Actor, project *domain.Project, template domain.Template) error {
+	member, isMember := project.MemberByID(actor.UserID)
+	if !isMember {
+		return fmt.Errorf("project %s: %w", project.ID, domain.ErrNotProjectMember)
+	}
+	if member.Role != template.CreatorRole {
+		return fmt.Errorf("project %s requires the %s Project Role: %w", project.ID, template.CreatorRole, domain.ErrForbidden)
+	}
+	return nil
+}
+
 func (s *ProjectConfigurationService) ValidateWorkItemAttributes(ctx context.Context, actor domain.Actor, projectID string, attrs domain.WorkItemAttributes) (domain.ValidationResult, error) {
 	project, err := s.loadVisible(ctx, actor, projectID)
 	if err != nil {
@@ -326,4 +405,333 @@ func templateOf(project *domain.Project) (domain.Template, error) {
 		return domain.Template{}, fmt.Errorf("project %s references unknown template %q", project.ID, project.TemplateID)
 	}
 	return template, nil
+}
+
+func (s *ProjectConfigurationService) SelfAssignAuditor(ctx context.Context, actor domain.Actor, projectID string) (domain.ProjectAuditorAssignment, error) {
+	if err := actor.Validate(); err != nil {
+		return domain.ProjectAuditorAssignment{}, fmt.Errorf("self-assign auditor: %w", err)
+	}
+	if actor.Role != domain.SystemRoleAuditor {
+		return domain.ProjectAuditorAssignment{}, fmt.Errorf("self-assign auditor: %w", domain.ErrForbidden)
+	}
+	project, err := s.loadVisible(ctx, actor, projectID)
+	if err != nil {
+		return domain.ProjectAuditorAssignment{}, fmt.Errorf("self-assign auditor: %w", err)
+	}
+	name, email := resolveAuthor(ctx, s.directory, actor)
+	assignment, err := s.repo.AssignAuditor(ctx, domain.ProjectAuditorAssignment{
+		ProjectID:     project.ID,
+		AuditorUserID: actor.UserID,
+		AuditorName:   name,
+		AuditorEmail:  email,
+		AssignedAt:    s.now(),
+	})
+	if err != nil {
+		return domain.ProjectAuditorAssignment{}, fmt.Errorf("self-assign auditor: %w", err)
+	}
+	return assignment, nil
+}
+
+func (s *ProjectConfigurationService) ListAuditorDirectory(ctx context.Context, actor domain.Actor) ([]domain.DirectoryUser, error) {
+	if err := actor.Validate(); err != nil {
+		return nil, fmt.Errorf("list auditor directory: %w", err)
+	}
+	auditors, err := s.directory.ListAuditors(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list auditor directory: %w", err)
+	}
+	slices.SortFunc(auditors, func(a, b domain.DirectoryUser) int {
+		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+	})
+	if auditors == nil {
+		auditors = []domain.DirectoryUser{}
+	}
+	return auditors, nil
+}
+
+func (s *ProjectConfigurationService) AssignProjectAuditor(ctx context.Context, actor domain.Actor, projectID, auditorUserID string) (domain.ProjectAuditorAssignment, error) {
+	project, err := s.loadMutable(ctx, actor, projectID)
+	if err != nil {
+		return domain.ProjectAuditorAssignment{}, fmt.Errorf("assign project auditor: %w", err)
+	}
+	auditorUserID = strings.TrimSpace(auditorUserID)
+	notAuditor := &domain.InvalidInputError{Violations: []domain.Violation{
+		{Field: "auditor_user_id", Message: "choose a user with the Auditor role"},
+	}}
+	if auditorUserID == "" || utf8.RuneCountInString(auditorUserID) > domain.MaxUserIDRunes {
+		return domain.ProjectAuditorAssignment{}, fmt.Errorf("assign project auditor: %w", notAuditor)
+	}
+	auditors, err := s.directory.ListAuditors(ctx)
+	if err != nil {
+		return domain.ProjectAuditorAssignment{}, fmt.Errorf("assign project auditor: %w", err)
+	}
+	index := slices.IndexFunc(auditors, func(user domain.DirectoryUser) bool { return user.ID == auditorUserID })
+	if index < 0 {
+		return domain.ProjectAuditorAssignment{}, fmt.Errorf("assign project auditor: %w", notAuditor)
+	}
+	auditor := auditors[index]
+	assignment, err := s.repo.AssignAuditor(ctx, domain.ProjectAuditorAssignment{
+		ProjectID:     project.ID,
+		AuditorUserID: auditor.ID,
+		AuditorName:   truncateRunes(auditor.Name, maxAuthorNameRunes),
+		AuditorEmail:  truncateRunes(auditor.Email, maxAuthorEmailRunes),
+		AssignedAt:    s.now(),
+	})
+	if err != nil {
+		return domain.ProjectAuditorAssignment{}, fmt.Errorf("assign project auditor: %w", err)
+	}
+	return assignment, nil
+}
+
+func (s *ProjectConfigurationService) ListProjectAuditors(ctx context.Context, actor domain.Actor, projectID string) ([]domain.ProjectAuditorAssignment, error) {
+	if _, err := s.loadVisible(ctx, actor, projectID); err != nil {
+		return nil, fmt.Errorf("list project auditors: %w", err)
+	}
+	assignments, err := s.repo.ListAuditors(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("list project auditors: %w", err)
+	}
+	if assignments == nil {
+		assignments = []domain.ProjectAuditorAssignment{}
+	}
+	return assignments, nil
+}
+
+func (s *ProjectConfigurationService) SubmitProjectFeedback(ctx context.Context, actor domain.Actor, projectID, body string) (domain.ProjectFeedback, error) {
+	if err := actor.Validate(); err != nil {
+		return domain.ProjectFeedback{}, fmt.Errorf("submit project feedback: %w", err)
+	}
+	if actor.Role != domain.SystemRoleAuditor {
+		return domain.ProjectFeedback{}, fmt.Errorf("submit project feedback: %w", domain.ErrForbidden)
+	}
+	project, err := s.loadVisible(ctx, actor, projectID)
+	if err != nil {
+		return domain.ProjectFeedback{}, fmt.Errorf("submit project feedback: %w", err)
+	}
+	assigned, err := s.repo.IsAuditorAssigned(ctx, project.ID, actor.UserID)
+	if err != nil {
+		return domain.ProjectFeedback{}, fmt.Errorf("submit project feedback: %w", err)
+	}
+	if !assigned {
+		return domain.ProjectFeedback{}, fmt.Errorf("submit project feedback: %w", domain.ErrForbidden)
+	}
+	trimmed := strings.TrimSpace(body)
+	switch {
+	case trimmed == "":
+		return domain.ProjectFeedback{}, fmt.Errorf("submit project feedback: %w", &domain.InvalidInputError{Violations: []domain.Violation{
+			{Field: "body", Message: "body is required"},
+		}})
+	case utf8.RuneCountInString(trimmed) > domain.MaxProjectFeedbackBodyRunes:
+		return domain.ProjectFeedback{}, fmt.Errorf("submit project feedback: %w", &domain.InvalidInputError{Violations: []domain.Violation{
+			{Field: "body", Message: fmt.Sprintf("body must be at most %d characters", domain.MaxProjectFeedbackBodyRunes)},
+		}})
+	}
+	name, email := resolveAuthor(ctx, s.directory, actor)
+	feedback := domain.ProjectFeedback{
+		ID:           s.newID(),
+		ProjectID:    project.ID,
+		AuthorUserID: actor.UserID,
+		AuthorName:   name,
+		AuthorEmail:  email,
+		Body:         trimmed,
+		CreatedAt:    s.now(),
+	}
+	if err := s.repo.CreateFeedback(ctx, &feedback); err != nil {
+		return domain.ProjectFeedback{}, fmt.Errorf("submit project feedback: %w", err)
+	}
+	return feedback, nil
+}
+
+func (s *ProjectConfigurationService) ListProjectFeedback(ctx context.Context, actor domain.Actor, projectID string) ([]domain.ProjectFeedback, error) {
+	if _, err := s.loadVisible(ctx, actor, projectID); err != nil {
+		return nil, fmt.Errorf("list project feedback: %w", err)
+	}
+	items, err := s.repo.ListFeedback(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("list project feedback: %w", err)
+	}
+	if items == nil {
+		items = []domain.ProjectFeedback{}
+	}
+	return items, nil
+}
+
+func (s *ProjectConfigurationService) UpdateProject(ctx context.Context, actor domain.Actor, projectID string, input in.UpdateProjectInput) (*domain.Project, error) {
+	project, template, err := s.loadOwnerMutable(ctx, actor, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("update project: %w", err)
+	}
+	name := project.Name
+	description := project.Description
+	if input.Name != nil {
+		name = *input.Name
+	}
+	if input.Description != nil {
+		description = *input.Description
+	}
+	templateID := project.TemplateID
+	if input.TemplateID != nil {
+		templateID = *input.TemplateID
+	}
+	nextTemplate, err := domain.ValidateProjectInput(name, description, templateID)
+	if err != nil {
+		return nil, fmt.Errorf("update project: %w", err)
+	}
+	project.Name = strings.TrimSpace(name)
+	project.Description = strings.TrimSpace(description)
+	project.TemplateID = nextTemplate.ID
+	project.Mode = nextTemplate.Mode
+	project.UpdatedAt = s.now()
+
+	if nextTemplate.ID == template.ID {
+		if err := s.repo.Update(ctx, project); err != nil {
+			return nil, fmt.Errorf("update project: %w", err)
+		}
+		return s.loadVisible(ctx, actor, project.ID)
+	}
+
+	// A template change rewrites every member's Project Role, so it runs under
+	// the membership lock against freshly read members, like the other
+	// membership mutations.
+	err = s.repo.WithMembershipLock(ctx, project.ID, func(ctx context.Context) error {
+		if err := s.refreshMembers(ctx, project); err != nil {
+			return err
+		}
+		if err := requireProjectOwner(actor, project, template); err != nil {
+			return err
+		}
+		if err := s.ensureTemplateChangeEligible(ctx, project); err != nil {
+			return err
+		}
+		return s.changeTemplate(ctx, project, template, nextTemplate)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update project: %w", err)
+	}
+	return s.loadVisible(ctx, actor, project.ID)
+}
+
+// changeTemplate moves the owners onto nextTemplate's creator role and clears
+// every other member's Project Role (the templates' roles differ, so the owner
+// reassigns them afterwards), then persists the project. Keycloak has no transactions, so when any step fails the roles
+// already rewritten are put back (best effort, logged) and the original error
+// is returned: the owner keeps the creator role of the template still stored.
+func (s *ProjectConfigurationService) changeTemplate(ctx context.Context, project *domain.Project, current, next domain.Template) error {
+	type change struct {
+		userID   string
+		previous domain.ProjectRole
+	}
+	var applied []change
+	undo := func() {
+		undoCtx := context.WithoutCancel(ctx)
+		for i := len(applied) - 1; i >= 0; i-- {
+			c := applied[i]
+			if err := s.directory.SetMemberRole(undoCtx, project.ID, c.userID, c.previous); err != nil {
+				slog.Error("undo template change: restore member role failed",
+					"project_id", project.ID, "user_id", c.userID, "role", c.previous, "error", err)
+			}
+		}
+	}
+	for _, member := range project.Members {
+		role := roleAfterTemplateChange(member.Role, current, next)
+		if role == member.Role {
+			continue
+		}
+		if err := s.directory.SetMemberRole(ctx, project.ID, member.UserID, role); err != nil {
+			undo()
+			return err
+		}
+		applied = append(applied, change{userID: member.UserID, previous: member.Role})
+	}
+	if err := s.repo.Update(ctx, project); err != nil {
+		undo()
+		return err
+	}
+	return nil
+}
+
+// roleAfterTemplateChange keeps owners as owners (the next template's creator
+// role) and clears everyone else's role.
+func roleAfterTemplateChange(role domain.ProjectRole, current, next domain.Template) domain.ProjectRole {
+	if role == current.CreatorRole {
+		return next.CreatorRole
+	}
+	return ""
+}
+
+// ensureTemplateChangeEligible refuses a template change while the Project has
+// Sprints or Work Items: both are shaped by the template. Refusals are field
+// violations so the owner is told what to remove, not a bare "conflict".
+func (s *ProjectConfigurationService) ensureTemplateChangeEligible(ctx context.Context, project *domain.Project) error {
+	if s.sprints == nil || s.workItems == nil {
+		return fmt.Errorf("template change eligibility checks unavailable: %w", domain.ErrUnavailable)
+	}
+	sprintCount, err := s.sprints.CountByProject(ctx, project.ID)
+	if err != nil {
+		return err
+	}
+	if sprintCount > 0 {
+		return templateChangeViolation(fmt.Sprintf(
+			"This Project has %d %s. Delete %s before changing the template.",
+			sprintCount, plural(sprintCount, "Sprint", "Sprints"), plural(sprintCount, "it", "them"),
+		))
+	}
+	itemCount, err := s.workItems.CountByProject(ctx, project.ID)
+	if err != nil {
+		return errorsJoinUnavailable(err)
+	}
+	if itemCount > 0 {
+		return templateChangeViolation(fmt.Sprintf(
+			"This Project has %d %s. Delete %s before changing the template.",
+			itemCount, plural(itemCount, "Work Item", "Work Items"), plural(itemCount, "it", "them"),
+		))
+	}
+	return nil
+}
+
+func templateChangeViolation(message string) error {
+	return &domain.InvalidInputError{Violations: []domain.Violation{{Field: "template_id", Message: message}}}
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
+}
+
+func (s *ProjectConfigurationService) DeleteProject(ctx context.Context, actor domain.Actor, projectID string) error {
+	project, _, err := s.loadOwnerMutable(ctx, actor, projectID)
+	if err != nil {
+		return fmt.Errorf("delete project: %w", err)
+	}
+	if s.sprints == nil || s.workItems == nil {
+		return fmt.Errorf("delete project: cleanup dependencies unavailable: %w", domain.ErrUnavailable)
+	}
+	// Every step is idempotent and the project row goes last, so a failure
+	// part-way leaves a still-existing project whose delete can simply be
+	// retried to finish the cleanup.
+	if err := s.workItems.DeleteByProject(ctx, project.ID); err != nil {
+		return fmt.Errorf("delete project: delete work items: %w", errorsJoinUnavailable(err))
+	}
+	if err := s.sprints.HardDeleteByProject(ctx, project.ID); err != nil {
+		return fmt.Errorf("delete project: delete sprints: %w", err)
+	}
+	// Delete the identity group before the project row so a failed DB delete
+	// remains retryable: group deletion is idempotent and the project still
+	// exists for a later attempt.
+	if err := s.directory.DeleteProjectGroup(ctx, project.GroupID); err != nil {
+		return fmt.Errorf("delete project: delete membership group: %w", err)
+	}
+	if err := s.repo.Delete(ctx, project.ID); err != nil {
+		return fmt.Errorf("delete project: %w", err)
+	}
+	return nil
+}
+
+func errorsJoinUnavailable(err error) error {
+	if err == nil {
+		return nil
+	}
+	return errors.Join(domain.ErrUnavailable, err)
 }

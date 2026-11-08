@@ -38,9 +38,9 @@ type Config struct {
 	RabbitMQNotificationQueue   string
 	InstanceName                string
 
-	ConsulHTTPAddr      string
-	ConsulServiceName   string
-	ConsulServicePort   int
+	ConsulHTTPAddr       string
+	ConsulServiceName    string
+	ConsulServicePort    int
 	ConsulServiceAddress string
 }
 
@@ -165,9 +165,20 @@ func (cfg Config) validate(service Service) error {
 	}
 
 	switch service {
-	case ServiceProject, ServiceSprint:
+	case ServiceProject:
 		if cfg.DatabaseURL == "" {
 			return fmt.Errorf("DATABASE_URL is not set")
+		}
+		// Project deletion and template changes read and delete Work Items.
+		if cfg.MongoURI == "" {
+			return fmt.Errorf("MONGODB_URI is not set")
+		}
+	case ServiceSprint:
+		if cfg.DatabaseURL == "" {
+			return fmt.Errorf("DATABASE_URL is not set")
+		}
+		if cfg.MongoURI == "" {
+			return fmt.Errorf("MONGODB_URI is not set")
 		}
 	case ServiceAnalytics:
 		if cfg.DatabaseURL == "" {
@@ -179,6 +190,9 @@ func (cfg Config) validate(service Service) error {
 	case ServiceWorkitem:
 		if cfg.MongoURI == "" {
 			return fmt.Errorf("MONGODB_URI is not set")
+		}
+		if cfg.DatabaseURL == "" {
+			return fmt.Errorf("DATABASE_URL is not set")
 		}
 		if cfg.RabbitMQURL == "" {
 			return fmt.Errorf("RABBITMQ_URL is not set")

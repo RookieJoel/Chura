@@ -34,7 +34,8 @@ make dev     # backend + frontend together (Ctrl-C stops both)
    Existing files are never overwritten; keys added to `.env.example` later are appended.
 4. **infra** — starts Keycloak, then Postgres and MongoDB, and waits until they are healthy.
 5. **migrate** — applies Postgres migrations with goose (in Docker).
-6. **seed-dev** — inserts the local dev project row (`scripts/seed-dev-postgres.sh`).
+6. **seed-dev** — seeds the local dev project, sprints, work items, and Keycloak
+   membership for `tonnam` / `pim` (`scripts/seed-dev-postgres.sh`).
 7. **frontend-deps** — `pnpm install --frozen-lockfile`.
 8. **verify-keycloak** — checks the local realm has the `chura-backend` service account.
 
@@ -42,7 +43,7 @@ make dev     # backend + frontend together (Ctrl-C stops both)
 
 | Target | Purpose |
 |---|---|
-| `make seed-dev` | Seed local Postgres dev data (after `make migrate`) |
+| `make seed-dev` | Seed project + sprints + work items + Keycloak membership (after `make migrate`) |
 | `make dev` | Run `backend-split` + frontend (`pnpm dev`) |
 | `make backend-split` | Four domain services on :8056–:8059 (no Kong) |
 | `make frontend` | Run only the frontend |

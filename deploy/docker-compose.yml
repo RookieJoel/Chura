@@ -141,6 +141,10 @@ services:
       KONG_DNS_NOT_FOUND_TTL: 30
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
+      # Browser WS upgrades can send large Auth.js cookies; defaults are too small (HTTP 431).
+      KONG_NGINX_HTTP_LARGE_CLIENT_HEADER_BUFFERS: 8 64k
+      KONG_NGINX_PROXY_LARGE_CLIENT_HEADER_BUFFERS: 8 64k
+      KONG_NGINX_HTTP_CLIENT_HEADER_BUFFER_SIZE: 16k
     entrypoint: ["/bin/sh", "/kong-entrypoint.sh"]
     volumes:
       - ./kong/kong.yml:/kong/kong.yml:ro

@@ -54,7 +54,10 @@ func (r *fakeSprintRepo) Update(_ context.Context, id string, s *domain.Sprint) 
 	}
 	for i := range r.sprints {
 		if r.sprints[i].ID == id {
-			r.sprints[i].Name = s.Name
+			projectID := r.sprints[i].ProjectID
+			r.sprints[i] = *s
+			r.sprints[i].ID = id
+			r.sprints[i].ProjectID = projectID
 			c := r.sprints[i]
 			return &c, nil
 		}
@@ -89,4 +92,8 @@ func (g *fakeGateway) RetrieveProjectData(_ context.Context, a domain.Actor, pro
 	g.calls++
 	g.gotID, g.gotActr = projectID, a
 	return g.project, g.err
+}
+
+func (g *fakeGateway) IsAuditorAssigned(_ context.Context, _, _ string) (bool, error) {
+	return false, nil
 }

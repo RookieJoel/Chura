@@ -8,10 +8,12 @@ import (
 )
 
 const (
-	MaxProjectNameRunes        = 100
-	MaxProjectDescriptionRunes = 2000
-	MaxUserIDRunes             = 100
-	MaxEmailRunes              = 254
+	MaxProjectNameRunes         = 100
+	MaxProjectDescriptionRunes  = 2000
+	MaxUserIDRunes              = 100
+	MaxEmailRunes               = 254
+	MaxProjectFeedbackBodyRunes = 4000
+	MaxWorkItemCommentBodyRunes = 4000
 
 	// Caps on validateWorkItemAttributes input, applied in every Template.
 	MaxWorkItemTitleRunes       = 200
@@ -49,6 +51,27 @@ type Member struct {
 	Email  string      `json:"email"`
 	Name   string      `json:"name"`
 	Role   ProjectRole `json:"role"`
+}
+
+// ProjectAuditorAssignment is an Auditor who self-assigned to a Project.
+// Assignments are permanent until the Project is permanently deleted.
+type ProjectAuditorAssignment struct {
+	ProjectID     string    `json:"project_id"`
+	AuditorUserID string    `json:"auditor_user_id"`
+	AuditorName   string    `json:"auditor_name"`
+	AuditorEmail  string    `json:"auditor_email"`
+	AssignedAt    time.Time `json:"assigned_at"`
+}
+
+// ProjectFeedback is one append-only project-level feedback entry.
+type ProjectFeedback struct {
+	ID           string    `json:"id"`
+	ProjectID    string    `json:"project_id"`
+	AuthorUserID string    `json:"author_user_id"`
+	AuthorName   string    `json:"author_name"`
+	AuthorEmail  string    `json:"author_email"`
+	Body         string    `json:"body"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // DirectoryUser is a user known to the identity provider. Role is empty when

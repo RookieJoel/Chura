@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createProject, listProjects } from "@/api/projects";
+import { createProject, getProject, listProjects } from "@/api/projects";
 import { getTemplate, listTemplates } from "@/api/templates";
 import { ProjectProvider } from "@/components/layout/project-provider";
 import { TopNav } from "@/components/layout/top-nav";
@@ -10,6 +10,7 @@ const push = vi.fn();
 
 vi.mock("@/api/projects", () => ({
   createProject: vi.fn(),
+  getProject: vi.fn(),
   listProjects: vi.fn(),
 }));
 vi.mock("@/api/templates", () => ({
@@ -25,6 +26,9 @@ const template = {
   id: "se",
   name: "Software Engineering",
   mode: "se",
+  work_item_types: ["user_story", "task", "bug"],
+  roles: ["product_owner", "scrum_master", "developer"],
+  default_role: "developer",
   creator_role: "product_owner",
 };
 const createdProject = {
@@ -33,6 +37,11 @@ const createdProject = {
   description: "A project description",
   template_id: "se",
   mode: "se",
+};
+const createdProjectDetails = {
+  ...createdProject,
+  created_by: "u1",
+  members: [],
 };
 
 function renderForm() {
@@ -49,6 +58,7 @@ describe("ProjectCreationForm", () => {
     localStorage.clear();
     push.mockReset();
     vi.mocked(listProjects).mockResolvedValue([]);
+    vi.mocked(getProject).mockResolvedValue(createdProjectDetails);
     vi.mocked(listTemplates).mockResolvedValue([template]);
     vi.mocked(getTemplate).mockResolvedValue(template);
     vi.mocked(createProject).mockResolvedValue(createdProject);

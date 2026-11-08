@@ -2,17 +2,17 @@ import { LoginRedirect } from "@/components/auth/login-redirect";
 
 function safeCallbackUrl(value: string | undefined) {
   if (!value) {
-    return "/";
+    return "/board";
   }
 
   try {
     const callbackUrl = new URL(value, "http://localhost");
     if (callbackUrl.origin !== "http://localhost") {
-      return "/";
+      return "/board";
     }
     return `${callbackUrl.pathname}${callbackUrl.search}${callbackUrl.hash}`;
   } catch {
-    return "/";
+    return "/board";
   }
 }
 
