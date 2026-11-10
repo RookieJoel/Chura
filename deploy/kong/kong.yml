@@ -48,6 +48,7 @@ services:
         paths:
           - /api/v1/templates
           - /api/v1/projects
+          - /api/v1/auditors
           - /api/v1/whoami
         strip_path: false
       - name: chura-health
@@ -60,6 +61,11 @@ services:
     port: 8058
     protocol: http
     routes:
+      - name: chura-workitem-comments
+        regex_priority: 100
+        paths:
+          - /api/v1/work-items/[^/]+/comments$
+        strip_path: false
       - name: chura-workitem-ws
         protocols:
           - http

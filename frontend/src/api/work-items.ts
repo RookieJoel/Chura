@@ -1,4 +1,12 @@
+import { SESSION_EXPIRED_MESSAGE, sameOriginRequest } from "@/api/client";
+import {
+  parseAcceptanceCriteria,
+  parseBlockedReason,
+  toApiWorkItemType,
+  toFrontendWorkItemType,
+} from "@/lib/work-item-utils";
 import type {
+  AcceptanceCriterion,
   WorkItem,
   WorkItemComment,
   WorkItemType,
@@ -6,7 +14,6 @@ import type {
   Priority,
 } from "@/types/work-item";
 
-const DEFAULT_PROJECT_ID = process.env.NEXT_PUBLIC_CHURA_PROJECT_ID;
 const DEFAULT_WS_URL = process.env.NEXT_PUBLIC_WORK_ITEM_RPC_URL;
 
 interface ApiWorkItem {
@@ -50,15 +57,55 @@ interface WorkItemResponse {
   error?: string;
 }
 
+export interface WorkItemValidationAttributes {
+  type: string;
+  title: string;
+  description?: string;
+  story_points?: number;
+  acceptance_criteria?: string[];
+}
+
+export interface ValidationViolation {
+  field: string;
+  message: string;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  violations: ValidationViolation[];
+}
+
+function mapStatus(status: string): WorkItemStatus {
+  if (status === "to_do") return "todo";
+  if (status === "blocked") return "blocked";
+  if (
+    status === "todo" ||
+    status === "in_progress" ||
+    status === "review" ||
+    status === "done"
+  ) {
+    return status;
+  }
+  return "todo";
+}
+
+function toApiStatus(status?: WorkItemStatus): string {
+  if (status === "todo") return "to_do";
+  return status ?? "to_do";
+}
+
 function toWorkItem(item: ApiWorkItem): WorkItem {
+  const type = toFrontendWorkItemType(item.type) ?? "task";
+  const status = mapStatus(item.status);
   return {
     id: item.id,
     projectId: item.project_id,
     title: item.title,
     description: item.description,
-    type: item.type === "user_story" ? "story" : (item.type as WorkItemType),
-    status: item.status === "to_do" ? "todo" : (item.status as WorkItemStatus),
-    blocked: item.status === "blocked",
+    type,
+    status,
+    blocked: status === "blocked",
+    blockedReason: parseBlockedReason(item.features),
     priority: item.priority === "critical" ? "highest" : (item.priority as Priority),
     storyPoints: item.story_points ?? 0,
     epic: "",
@@ -67,7 +114,7 @@ function toWorkItem(item: ApiWorkItem): WorkItem {
     sprintId: item.sprint_id || null,
     labels: [],
     features: item.features,
-    acceptanceCriteria: [],
+    acceptanceCriteria: parseAcceptanceCriteria(item.features),
     createdAt: item.created_at,
     updatedAt: item.updated_at,
   };
@@ -85,6 +132,8 @@ export interface WorkItemInput {
   reporterId?: string;
   storyPoints?: number;
   features?: Record<string, unknown>;
+  acceptanceCriteria?: AcceptanceCriterion[] | string[];
+  blockedReason?: string;
 }
 
 export type CreateWorkItemInput = WorkItemInput;
@@ -92,52 +141,102 @@ export interface UpdateWorkItemInput extends WorkItemInput {
   id: string;
 }
 
+function requireProjectId(projectId: string | null | undefined): string {
+  const id = projectId?.trim();
+  if (!id) throw new Error("A Project must be selected");
+  return id;
+}
+
+function buildFeatures(input: WorkItemInput): Record<string, unknown> {
+  const features: Record<string, unknown> = { ...(input.features ?? {}) };
+
+  if (input.acceptanceCriteria !== undefined) {
+    const criteria = input.acceptanceCriteria
+      .map((entry) => {
+        if (typeof entry === "string") {
+          const text = entry.trim();
+          return text ? { text, done: false } : null;
+        }
+        const text = entry.text.trim();
+        return text ? { text, done: Boolean(entry.done) } : null;
+      })
+      .filter((entry): entry is { text: string; done: boolean } => entry !== null);
+    if (criteria.length > 0) features.acceptance_criteria = criteria;
+    else delete features.acceptance_criteria;
+  }
+
+  const status = input.status ?? "todo";
+  if (status === "blocked") {
+    const reason = input.blockedReason?.trim();
+    if (reason) features.blocked_reason = reason;
+  } else {
+    delete features.blocked_reason;
+  }
+
+  return features;
+}
+
 function toPayload(input: WorkItemInput, id?: string): ApiWorkItemInput {
-  const projectId = input.projectId ?? DEFAULT_PROJECT_ID;
-  if (!projectId) throw new Error("NEXT_PUBLIC_CHURA_PROJECT_ID is not configured");
+  const projectId = requireProjectId(input.projectId);
   return {
     ...(id ? { id } : {}),
     project_id: projectId,
     sprint_id: input.sprintId,
     title: input.title,
     description: input.description ?? "",
-    type: input.type === "story" ? "user_story" : input.type ?? "task",
-    status: input.status === "todo" ? "to_do" : input.status ?? "to_do",
+    type: toApiWorkItemType(input.type ?? "task"),
+    status: toApiStatus(input.status),
     priority: input.priority === "highest" ? "critical" : input.priority ?? "medium",
     assignee_id: input.assigneeId ?? "",
     reporter_id: input.reporterId ?? "",
     story_points: input.storyPoints ?? 0,
-    features: input.features ?? {},
+    features: buildFeatures(input),
   };
 }
 
-function websocketURL(accessToken: string): string {
+function websocketURL(): string {
   const baseURL = DEFAULT_WS_URL;
   if (baseURL) {
     const url = new URL(baseURL);
-    url.searchParams.set("access_token", accessToken);
+    // Prefer 127.0.0.1 over localhost so the browser does not attach Auth.js
+    // cookies (same registrable host) and Kong returns HTTP 431.
+    if (url.hostname === "localhost") {
+      url.hostname = "127.0.0.1";
+    }
     return url.toString();
   }
   if (typeof window === "undefined") {
     throw new Error("NEXT_PUBLIC_WORK_ITEM_RPC_URL is not configured");
   }
-  const url = new URL(
-    `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/work-items`,
-  );
-  url.searchParams.set("access_token", accessToken);
-  return url.toString();
+  return fallbackWebsocketURL(window.location);
+}
+
+// Without an explicit NEXT_PUBLIC_WORK_ITEM_RPC_URL, a local dev page talks to
+// Kong on 127.0.0.1:8083 (not localhost, so Auth.js cookies are not attached
+// and Kong does not answer 431); any other host is served same-origin.
+export function fallbackWebsocketURL(
+  location: Pick<Location, "protocol" | "hostname" | "host">,
+): string {
+  const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+  const isLocal =
+    location.hostname === "localhost" || location.hostname === "127.0.0.1";
+  const host = isLocal ? "127.0.0.1:8083" : location.host;
+  return `${scheme}//${host}/ws/work-items`;
 }
 
 async function openWorkItemSocket(): Promise<WebSocket> {
   const tokenResponse = await fetch("/api/ws-token", { cache: "no-store" });
   if (!tokenResponse.ok) {
+    if (tokenResponse.status === 401) throw new Error(SESSION_EXPIRED_MESSAGE);
     throw new Error(`Unable to authenticate WorkItem socket (${tokenResponse.status})`);
   }
   const token = (await tokenResponse.json()) as { access_token?: string };
   if (!token.access_token) throw new Error("WorkItem socket token is missing");
   const accessToken = token.access_token;
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(websocketURL(accessToken), "chura-auth");
+    // Token rides in the Sec-WebSocket-Protocol header (auth.<jwt>), which the
+    // backend already accepts. Keep "chura-auth" for upgrade negotiation.
+    const socket = new WebSocket(websocketURL(), ["chura-auth", `auth.${accessToken}`]);
     socket.onopen = () => resolve(socket);
     socket.onerror = () => reject(new Error("Unable to connect to WorkItem socket"));
     socket.onclose = (event) => {
@@ -188,9 +287,9 @@ export interface ListWorkItemsParams {
 }
 
 export async function listWorkItems(params: ListWorkItemsParams = {}): Promise<WorkItem[]> {
-  const projectId = params.projectId ?? DEFAULT_PROJECT_ID;
-  if (!params.sprintId && !projectId) {
-    throw new Error("NEXT_PUBLIC_CHURA_PROJECT_ID is not configured");
+  const projectId = params.projectId?.trim() ?? "";
+  if (!projectId) {
+    throw new Error("A Project must be selected");
   }
   const response = await sendWorkItemMessage({
     operation: "list",
@@ -212,12 +311,36 @@ export async function getWorkItem(id: string): Promise<WorkItem | null> {
   }
 }
 
-export async function validateWorkItem(input: CreateWorkItemInput): Promise<boolean> {
-  const response = await sendWorkItemMessage({
-    operation: "validate",
-    work_item: toPayload(input),
-  });
-  return response.valid === true;
+function isValidationResult(value: unknown): value is ValidationResult {
+  if (typeof value !== "object" || value === null) return false;
+  const result = value as Record<string, unknown>;
+  return (
+    typeof result.valid === "boolean" &&
+    Array.isArray(result.violations) &&
+    result.violations.every((violation) => {
+      if (typeof violation !== "object" || violation === null) return false;
+      const entry = violation as Record<string, unknown>;
+      return typeof entry.field === "string" && typeof entry.message === "string";
+    })
+  );
+}
+
+/** Template-aware validation via REST. Persists nothing; valid=false is still 200. */
+export async function validateWorkItemAttributes(
+  projectId: string,
+  attrs: WorkItemValidationAttributes,
+): Promise<ValidationResult> {
+  const result = await sameOriginRequest<unknown>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/work-items/validate`,
+    {
+      method: "POST",
+      body: JSON.stringify(attrs),
+    },
+  );
+  if (!isValidationResult(result)) {
+    throw new Error("Invalid work item validation response");
+  }
+  return result;
 }
 
 export async function createWorkItem(input: CreateWorkItemInput): Promise<WorkItem> {
@@ -240,7 +363,63 @@ export async function deleteWorkItem(id: string): Promise<void> {
   await sendWorkItemMessage({ operation: "delete", id });
 }
 
+interface ApiWorkItemComment {
+  id: string;
+  work_item_id: string;
+  author_user_id: string;
+  author_name: string;
+  author_email: string;
+  body: string;
+  created_at: string;
+}
+
+function isApiWorkItemComment(value: unknown): value is ApiWorkItemComment {
+  if (typeof value !== "object" || value === null) return false;
+  const item = value as Record<string, unknown>;
+  return (
+    typeof item.id === "string" &&
+    typeof item.work_item_id === "string" &&
+    typeof item.author_user_id === "string" &&
+    typeof item.author_name === "string" &&
+    typeof item.author_email === "string" &&
+    typeof item.body === "string" &&
+    typeof item.created_at === "string"
+  );
+}
+
+function toWorkItemComment(item: ApiWorkItemComment): WorkItemComment {
+  return {
+    id: item.id,
+    workItemId: item.work_item_id,
+    authorUserId: item.author_user_id,
+    authorName: item.author_name,
+    authorEmail: item.author_email,
+    body: item.body,
+    createdAt: item.created_at,
+  };
+}
+
+/** Newest-first append-only comments from Session 4 REST. */
 export async function listComments(workItemId: string): Promise<WorkItemComment[]> {
-  void workItemId;
-  return [];
+  const items = await sameOriginRequest<unknown>(
+    `/api/v1/work-items/${encodeURIComponent(workItemId)}/comments`,
+  );
+  if (!Array.isArray(items) || !items.every(isApiWorkItemComment)) {
+    throw new Error("Invalid Work Item comments response");
+  }
+  return items.map(toWorkItemComment);
+}
+
+export async function createComment(
+  workItemId: string,
+  body: string,
+): Promise<WorkItemComment> {
+  const comment = await sameOriginRequest<unknown>(
+    `/api/v1/work-items/${encodeURIComponent(workItemId)}/comments`,
+    { method: "POST", body: JSON.stringify({ body }) },
+  );
+  if (!isApiWorkItemComment(comment)) {
+    throw new Error("Invalid Work Item comment create response");
+  }
+  return toWorkItemComment(comment);
 }

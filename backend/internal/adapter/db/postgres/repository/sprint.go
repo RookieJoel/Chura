@@ -187,6 +187,25 @@ func (r *SprintRepository) Delete(
 	return nil
 }
 
+func (r *SprintRepository) CountByProject(ctx context.Context, projectID string) (int, error) {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&sprintModel{}).
+		Where("project_id = ?", projectID).
+		Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("count sprints for project %s: %w", projectID, err)
+	}
+	return int(count), nil
+}
+
+func (r *SprintRepository) HardDeleteByProject(ctx context.Context, projectID string) error {
+	if err := r.db.WithContext(ctx).Unscoped().
+		Where("project_id = ?", projectID).
+		Delete(&sprintModel{}).Error; err != nil {
+		return fmt.Errorf("hard delete sprints for project %s: %w", projectID, err)
+	}
+	return nil
+}
+
 // parseSprintID maps a non-numeric id to ErrNotFound: no such sprint can exist.
 func parseSprintID(id string) (uint64, error) {
 	sprintID, err := strconv.ParseUint(id, 10, 64)

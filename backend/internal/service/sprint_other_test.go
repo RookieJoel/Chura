@@ -27,7 +27,7 @@ func visibleGateway() *fakeGateway {
 func TestListSprints_ChecksProjectAccessAndFiltersByProject(t *testing.T) {
 	for _, actor := range []domain.Actor{memberActor, sprintAuditor} {
 		repo, gw := seededSprints(), visibleGateway()
-		svc := service.NewSprintService(repo, gw)
+		svc := service.NewSprintService(repo, gw, &fakeSprintWorkItems{})
 
 		got, err := svc.ListSprints(context.Background(), actor, " "+sprintProjectID+" ")
 
@@ -45,7 +45,7 @@ func TestListSprints_ChecksProjectAccessAndFiltersByProject(t *testing.T) {
 
 func TestListSprints_MissingProjectIDIsInvalidInputOnProjectID(t *testing.T) {
 	repo, gw := seededSprints(), visibleGateway()
-	svc := service.NewSprintService(repo, gw)
+	svc := service.NewSprintService(repo, gw, &fakeSprintWorkItems{})
 
 	_, err := svc.ListSprints(context.Background(), memberActor, "  ")
 
@@ -73,7 +73,7 @@ func TestListSprints_RejectsBadActorBadIDAndHiddenProject(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := seededSprints()
-			_, err := service.NewSprintService(repo, tc.gw).ListSprints(context.Background(), tc.actor, tc.projectID)
+			_, err := service.NewSprintService(repo, tc.gw, &fakeSprintWorkItems{}).ListSprints(context.Background(), tc.actor, tc.projectID)
 
 			if !errors.Is(err, tc.want) {
 				t.Fatalf("want %v, got %v", tc.want, err)
@@ -88,7 +88,7 @@ func TestListSprints_RejectsBadActorBadIDAndHiddenProject(t *testing.T) {
 func TestGetSprint_MemberAndAuditorCanRead(t *testing.T) {
 	for _, actor := range []domain.Actor{memberActor, sprintAuditor} {
 		gw := visibleGateway()
-		got, err := service.NewSprintService(seededSprints(), gw).GetSprint(context.Background(), actor, "1")
+		got, err := service.NewSprintService(seededSprints(), gw, &fakeSprintWorkItems{}).GetSprint(context.Background(), actor, "1")
 
 		if err != nil || got.Name != "Old" {
 			t.Fatalf("get: %+v, %v", got, err)
@@ -113,7 +113,7 @@ func TestGetSprint_ErrorCases(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := service.NewSprintService(seededSprints(), tc.gw).GetSprint(context.Background(), tc.actor, tc.id)
+			got, err := service.NewSprintService(seededSprints(), tc.gw, &fakeSprintWorkItems{}).GetSprint(context.Background(), tc.actor, tc.id)
 
 			if !errors.Is(err, tc.want) || got != nil {
 				t.Fatalf("want %v, got %+v / %v", tc.want, got, err)
@@ -125,7 +125,7 @@ func TestGetSprint_ErrorCases(t *testing.T) {
 func TestUpdateSprint_MemberUpdatesAndKeepsProjectID(t *testing.T) {
 	repo, gw := seededSprints(), visibleGateway()
 
-	updated, err := service.NewSprintService(repo, gw).UpdateSprint(context.Background(), memberActor, "1",
+	updated, err := service.NewSprintService(repo, gw, &fakeSprintWorkItems{}).UpdateSprint(context.Background(), memberActor, "1",
 		&domain.Sprint{Name: "New", Team: "Alpha"})
 
 	if err != nil || updated.Name != "New" || updated.ProjectID != sprintProjectID {
@@ -154,7 +154,7 @@ func TestUpdateSprint_ErrorCasesDoNotPersist(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := seededSprints()
 
-			_, err := service.NewSprintService(repo, tc.gw).UpdateSprint(context.Background(), tc.actor, tc.id,
+			_, err := service.NewSprintService(repo, tc.gw, &fakeSprintWorkItems{}).UpdateSprint(context.Background(), tc.actor, tc.id,
 				&domain.Sprint{Name: "New", Team: "Alpha"})
 
 			if !errors.Is(err, tc.want) {
@@ -170,7 +170,7 @@ func TestUpdateSprint_ErrorCasesDoNotPersist(t *testing.T) {
 func TestUpdateSprint_InvalidSprintReportsViolations(t *testing.T) {
 	repo := seededSprints()
 
-	_, err := service.NewSprintService(repo, visibleGateway()).UpdateSprint(context.Background(), memberActor, "1",
+	_, err := service.NewSprintService(repo, visibleGateway(), &fakeSprintWorkItems{}).UpdateSprint(context.Background(), memberActor, "1",
 		&domain.Sprint{Name: " ", Team: ""})
 
 	var invalid *domain.InvalidInputError
@@ -185,7 +185,7 @@ func TestUpdateSprint_InvalidSprintReportsViolations(t *testing.T) {
 
 func TestDeleteSprint_MemberDeletes(t *testing.T) {
 	repo := seededSprints()
-	svc := service.NewSprintService(repo, visibleGateway())
+	svc := service.NewSprintService(repo, visibleGateway(), &fakeSprintWorkItems{})
 
 	if err := svc.DeleteSprint(context.Background(), memberActor, "1"); err != nil {
 		t.Fatalf("delete: %v", err)
@@ -213,7 +213,7 @@ func TestDeleteSprint_ErrorCasesDoNotDelete(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := seededSprints()
 
-			err := service.NewSprintService(repo, tc.gw).DeleteSprint(context.Background(), tc.actor, tc.id)
+			err := service.NewSprintService(repo, tc.gw, &fakeSprintWorkItems{}).DeleteSprint(context.Background(), tc.actor, tc.id)
 
 			if !errors.Is(err, tc.want) {
 				t.Fatalf("want %v, got %v", tc.want, err)
@@ -230,7 +230,7 @@ func TestSprintService_WrapsRepositoryErrorsWithContext(t *testing.T) {
 	newSvc := func() *service.SprintService {
 		repo := seededSprints()
 		repo.opErr = storageErr
-		return service.NewSprintService(repo, visibleGateway())
+		return service.NewSprintService(repo, visibleGateway(), &fakeSprintWorkItems{})
 	}
 	ctx := context.Background()
 	sprint := &domain.Sprint{ProjectID: sprintProjectID, Name: "New", Team: "Alpha"}
@@ -267,9 +267,92 @@ func TestSprintService_WrapsRepositoryErrorsWithContext(t *testing.T) {
 }
 
 func TestGetSprint_WrapsNotFoundWithContext(t *testing.T) {
-	_, err := service.NewSprintService(seededSprints(), visibleGateway()).GetSprint(context.Background(), memberActor, "99")
+	_, err := service.NewSprintService(seededSprints(), visibleGateway(), &fakeSprintWorkItems{}).GetSprint(context.Background(), memberActor, "99")
 
 	if !errors.Is(err, domain.ErrNotFound) || !strings.HasPrefix(err.Error(), "get sprint: ") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestCreateSprint_ActiveStatusIsRejectedWithoutWorkItems(t *testing.T) {
+	repo := &fakeSprintRepo{}
+	_, err := service.NewSprintService(repo, visibleGateway(), &fakeSprintWorkItems{}).CreateSprint(
+		context.Background(),
+		memberActor,
+		&domain.Sprint{ProjectID: sprintProjectID, Name: "Sprint 1", Team: "Alpha", Status: domain.Active},
+	)
+
+	var invalid *domain.InvalidInputError
+	if !errors.As(err, &invalid) || len(invalid.Violations) != 1 ||
+		invalid.Violations[0].Field != "status" ||
+		invalid.Violations[0].Message != "sprint cannot start without work items" {
+		t.Fatalf("want status violation, got %v", err)
+	}
+	if repo.createCalls != 0 {
+		t.Fatal("empty active create must not persist")
+	}
+}
+
+func TestUpdateSprint_RejectsStartWhenSprintHasZeroWorkItems(t *testing.T) {
+	repo := seededSprints()
+	workItems := &fakeSprintWorkItems{}
+
+	_, err := service.NewSprintService(repo, visibleGateway(), workItems).UpdateSprint(
+		context.Background(),
+		memberActor,
+		"1",
+		&domain.Sprint{Name: "Old", Team: "Alpha", Status: domain.Active},
+	)
+
+	var invalid *domain.InvalidInputError
+	if !errors.As(err, &invalid) || len(invalid.Violations) != 1 ||
+		invalid.Violations[0].Field != "status" {
+		t.Fatalf("want status violation, got %v", err)
+	}
+	if repo.updateCalls != 0 {
+		t.Fatal("empty start must not persist")
+	}
+	if workItems.calls != 1 || workItems.gotProject != sprintProjectID || workItems.gotSprint != "1" {
+		t.Fatalf("work items not checked: %+v", workItems)
+	}
+}
+
+func TestUpdateSprint_StartsWhenSprintHasWorkItems(t *testing.T) {
+	repo := seededSprints()
+	workItems := &fakeSprintWorkItems{items: []domain.WorkItem{{ID: "wi-1", Title: "Task"}}}
+
+	updated, err := service.NewSprintService(repo, visibleGateway(), workItems).UpdateSprint(
+		context.Background(),
+		memberActor,
+		"1",
+		&domain.Sprint{Name: "Old", Team: "Alpha", Status: domain.Active},
+	)
+
+	if err != nil || updated.Status != domain.Active {
+		t.Fatalf("start: %+v, %v", updated, err)
+	}
+	if repo.updateCalls != 1 {
+		t.Fatalf("updateCalls = %d, want 1", repo.updateCalls)
+	}
+}
+
+func TestUpdateSprint_CompleteDoesNotRequireWorkItemsOrMoveThem(t *testing.T) {
+	repo := &fakeSprintRepo{sprints: []domain.Sprint{{
+		ID: "1", ProjectID: sprintProjectID, Name: "Old", Team: "Alpha", Status: domain.Active,
+	}}}
+	workItems := &fakeSprintWorkItems{items: []domain.WorkItem{{ID: "wi-1", Title: "Still open"}}}
+
+	updated, err := service.NewSprintService(repo, visibleGateway(), workItems).UpdateSprint(
+		context.Background(),
+		memberActor,
+		"1",
+		&domain.Sprint{Name: "Old", Team: "Alpha", Status: domain.Completed},
+	)
+
+	if err != nil || updated.Status != domain.Completed {
+		t.Fatalf("complete: %+v, %v", updated, err)
+	}
+	if workItems.calls != 0 {
+		t.Fatal("completing must not re-check or mutate work items")
 	}
 }

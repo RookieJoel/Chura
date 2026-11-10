@@ -1,10 +1,13 @@
-export async function apiRequest<T>(
+export const SESSION_EXPIRED_MESSAGE =
+  "Your session has expired. Please sign in again to continue.";
+
+export async function sameOriginRequest<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`/api/backend${path}`, {
+    response = await fetch(path, {
       ...init,
       headers: {
         "content-type": "application/json",
@@ -33,14 +36,43 @@ export async function apiRequest<T>(
     );
   }
   if (!response.ok) {
-    const message =
-      typeof data === "object" &&
-      data !== null &&
-      "error" in data &&
-      typeof data.error === "string"
-        ? data.error
-        : `Backend request failed (${response.status})`;
-    throw new Error(`${message} (${response.status})`);
+    // A 401 always means the sign-in session ran out (or was never there),
+    // whichever service answered; say so instead of "Unauthenticated (401)".
+    if (response.status === 401) {
+      throw new Error(SESSION_EXPIRED_MESSAGE);
+    }
+    if (typeof data === "object" && data !== null) {
+      if ("violations" in data && Array.isArray(data.violations) && data.violations.length > 0) {
+        const messages = data.violations
+          .map((violation) => {
+            if (
+              typeof violation === "object" &&
+              violation !== null &&
+              "message" in violation &&
+              typeof violation.message === "string" &&
+              violation.message.trim()
+            ) {
+              return violation.message.trim();
+            }
+            return "";
+          })
+          .filter(Boolean);
+        if (messages.length > 0) {
+          throw new Error(`${messages.join("; ")} (${response.status})`);
+        }
+      }
+      if ("error" in data && typeof data.error === "string") {
+        throw new Error(`${data.error} (${response.status})`);
+      }
+    }
+    throw new Error(`Backend request failed (${response.status})`);
   }
   return data as T;
+}
+
+export async function apiRequest<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  return sameOriginRequest<T>(`/api/backend${path}`, init);
 }

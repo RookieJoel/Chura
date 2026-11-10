@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 
+	"github.com/RookieJoel/Chura/backend/internal/adapter/db"
+	memory "github.com/RookieJoel/Chura/backend/internal/adapter/db/postgres/repository"
 	emailadapter "github.com/RookieJoel/Chura/backend/internal/adapter/email"
 	workitemgrpc "github.com/RookieJoel/Chura/backend/internal/adapter/handler/grpc"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
@@ -27,6 +29,21 @@ func main() {
 	defer func() {
 		if err := connections.Close(); err != nil {
 			log.Printf("close connections: %v", err)
+		}
+	}()
+
+	postgresDB, err := db.ConnectPostgresDB(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		sqlDB, dbErr := postgresDB.DB()
+		if dbErr != nil {
+			log.Printf("access postgres handle: %v", dbErr)
+			return
+		}
+		if closeErr := sqlDB.Close(); closeErr != nil {
+			log.Printf("close postgres: %v", closeErr)
 		}
 	}()
 
@@ -77,12 +94,25 @@ func main() {
 	workItemService := service.NewWorkItemServiceWithPublisher(workItemRepository, rabbitPublisher)
 	gateway := workitemgrpc.NewLocalWorkItemGateway(workItemService)
 
+	projectService := service.NewProjectConfigurationService(
+		memory.NewProjectRepository(postgresDB),
+		directory,
+	)
+	commentService := service.NewWorkItemCommentService(
+		connections.Mongo.WorkItemComments,
+		workItemRepository,
+		projectService,
+		directory,
+	)
+
 	app := http.NewBaseApp(cfg.FrontendURL, cfg.InstanceName)
 	authMiddleware, err := runtime.AuthMiddleware(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	http.RegisterWorkItemWebSocket(app, gateway, authMiddleware)
+	api := app.Group("/api/v1", authMiddleware)
+	http.RegisterWorkItemCommentRoutes(api, http.NewWorkItemCommentHandler(commentService))
 
 	if err := runtime.ListenAndServe(cfg, app); err != nil {
 		log.Fatal(err)

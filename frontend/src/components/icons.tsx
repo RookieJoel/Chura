@@ -105,6 +105,16 @@ export function SettingsIcon(props: IconProps) {
   );
 }
 
+export function MessageSquareIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.5-3A7.5 7.5 0 1 1 20 11.5Z" />
+      <line x1="8" y1="11" x2="16" y2="11" />
+      <line x1="8" y1="14" x2="13" y2="14" />
+    </Icon>
+  );
+}
+
 export function BookmarkIcon(props: IconProps) {
   return (
     <Icon {...props}>

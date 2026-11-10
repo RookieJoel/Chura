@@ -1,15 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getSprintMetrics } from "@/api/analytics";
 import { getActiveSprint } from "@/api/sprints";
 import { listWorkItems, updateWorkItem } from "@/api/work-items";
-import { listMembers } from "@/api/members";
+import { membersOf } from "@/api/members";
+import { SprintMetricsSummary } from "@/components/board/sprint-metrics-summary";
 import { AppShell } from "@/components/layout/app-shell";
+import { NoProjectSelected } from "@/components/layout/no-project-selected";
+import { useProjects } from "@/components/layout/project-provider";
 import { WorkItemCard } from "@/components/work-items/work-item-card";
-import { SearchIcon } from "@/components/icons";
 import { WorkItemAvatar } from "@/components/work-items/avatar";
 import Link from "next/link";
-import type { WorkItem } from "@/types/work-item";
+import type { SprintMetrics } from "@/types/analytics";
+import type { Member, WorkItem } from "@/types/work-item";
+import { canMutateExecution } from "@/lib/roles";
 import {
   STATUS_LABELS,
   STATUS_ORDER,
@@ -23,25 +28,82 @@ function formatDateRange(startDate: string, endDate: string) {
   return `${format(startDate)} – ${format(endDate)}`;
 }
 
-export default function BoardPage() {
+function BoardView({
+  selectedProjectId,
+  projectsLoadState,
+  canMutate,
+  members,
+}: {
+  selectedProjectId: string | null;
+  projectsLoadState: "loading" | "error" | "ready";
+  canMutate: boolean;
+  members: Member[];
+}) {
   const [sprint, setSprint] = useState<Awaited<ReturnType<typeof getActiveSprint>>>(null);
-  const [members, setMembers] = useState<Awaited<ReturnType<typeof listMembers>>>([]);
   const [items, setItems] = useState<Awaited<ReturnType<typeof listWorkItems>>>([]);
-  const [loading, setLoading] = useState(true);
+  const [metrics, setMetrics] = useState<SprintMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [metricsError, setMetricsError] = useState<string>();
+  const [loading, setLoading] = useState(Boolean(selectedProjectId));
   const [error, setError] = useState<string>();
   const [savingItemId, setSavingItemId] = useState<string>();
 
+  const refreshMetrics = async (sprintId: string) => {
+    setMetricsLoading(true);
+    setMetricsError(undefined);
+    try {
+      const nextMetrics = await getSprintMetrics(sprintId);
+      setMetrics(nextMetrics);
+    } catch (cause) {
+      setMetrics(null);
+      setMetricsError(
+        cause instanceof Error ? cause.message : "Unable to load sprint metrics",
+      );
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
+
   useEffect(() => {
     let active = true;
-    Promise.all([getActiveSprint(), listMembers()])
-      .then(async ([nextSprint, nextMembers]) => {
+
+    if (!selectedProjectId) {
+      return () => {
+        active = false;
+      };
+    }
+
+    getActiveSprint(selectedProjectId)
+      .then(async (nextSprint) => {
         const nextItems = nextSprint
-          ? await listWorkItems({ sprintId: nextSprint.id })
+          ? await listWorkItems({
+              sprintId: nextSprint.id,
+              projectId: selectedProjectId,
+            })
           : [];
         if (!active) return;
         setSprint(nextSprint);
-        setMembers(nextMembers);
         setItems(nextItems);
+        setMetrics(null);
+        setMetricsError(undefined);
+        if (nextSprint) {
+          setMetricsLoading(true);
+          try {
+            const nextMetrics = await getSprintMetrics(nextSprint.id);
+            if (active) setMetrics(nextMetrics);
+          } catch (cause) {
+            if (active) {
+              setMetrics(null);
+              setMetricsError(
+                cause instanceof Error
+                  ? cause.message
+                  : "Unable to load sprint metrics",
+              );
+            }
+          } finally {
+            if (active) setMetricsLoading(false);
+          }
+        }
       })
       .catch((cause) => {
         if (active) {
@@ -54,19 +116,46 @@ export default function BoardPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [selectedProjectId]);
 
   const handleStatusChange = async (item: WorkItem, status: WorkItem["status"]) => {
+    if (!canMutate) return;
     if (status === item.status) return;
+
+    let blockedReason = item.blockedReason;
+    if (status === "blocked") {
+      const reason = window.prompt(
+        "Why is this work item blocked?",
+        item.blockedReason ?? "",
+      );
+      if (!reason?.trim()) {
+        setError("A blocked reason is required");
+        return;
+      }
+      blockedReason = reason.trim();
+    } else {
+      blockedReason = undefined;
+    }
+
     setSavingItemId(item.id);
     setError(undefined);
     try {
-      const updated = await updateWorkItem({ ...item, status, id: item.id });
+      const updated = await updateWorkItem({
+        ...item,
+        status,
+        id: item.id,
+        projectId: item.projectId ?? selectedProjectId ?? undefined,
+        acceptanceCriteria: item.acceptanceCriteria,
+        blockedReason,
+      });
       setItems((current) =>
         current.map((currentItem) =>
           currentItem.id === updated.id ? updated : currentItem,
         ),
       );
+      if (sprint) {
+        void refreshMetrics(sprint.id);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to update work item");
     } finally {
@@ -79,15 +168,17 @@ export default function BoardPage() {
   const totalPoints = sumPoints(items);
 
   return (
-    <AppShell>
+    <>
       <div className="flex items-center justify-between border-b border-border bg-surface px-8 py-5">
         <div className="flex items-center gap-3.5">
           <div>
-            <p className="m-0 text-[11px] font-bold uppercase tracking-wider text-text-tertiary">Active sprint</p>
+            <p className="m-0 text-[11px] font-bold uppercase tracking-wider text-text-tertiary">
+              Active sprint
+            </p>
             <h1 className="m-0 mt-1 text-2xl font-bold tracking-tight">Board</h1>
           </div>
           {sprint && (
-            <div className="flex items-center gap-1.5 rounded-md bg-brand-tint px-3 py-1.5 text-[12.5px] font-bold text-brand-dark">
+            <div className="flex items-center gap-1.5 bg-brand-tint px-3 py-1.5 text-[12.5px] font-semibold text-brand-dark">
               {sprint.name}
               <span className="font-medium opacity-75">
                 &middot; {formatDateRange(sprint.startDate, sprint.endDate)}
@@ -102,31 +193,39 @@ export default function BoardPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 border-b border-border bg-surface px-7 py-3">
-        <div className="flex w-[260px] items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-text-tertiary">
-          <SearchIcon className="size-3.5" />
-          <span className="text-[12.5px]">Filter work items</span>
+      {sprint && (
+        <SprintMetricsSummary
+          metrics={metrics}
+          loading={metricsLoading}
+          error={metricsError}
+        />
+      )}
+
+      {members.length > 0 && (
+        <div className="flex items-center gap-3 border-b border-border bg-surface px-7 py-3">
+          <div className="flex items-center">
+            {members.map((member, index) => (
+              <WorkItemAvatar
+                key={member.id}
+                member={member}
+                className={`border-2 border-surface ${index < members.length - 1 ? "-mr-1.5" : ""}`}
+              />
+            ))}
+          </div>
         </div>
-        <div className="flex items-center">
-          {members.map((member, index) => (
-            <WorkItemAvatar
-              key={member.id}
-              member={member}
-              className={`border-2 border-surface ${index < members.length - 1 ? "-mr-1.5" : ""}`}
-            />
-          ))}
-        </div>
-      </div>
+      )}
 
       {error && (
         <p className="m-0 border-b border-border px-7 py-3 text-sm text-red-600">
           {error}
         </p>
       )}
-      {loading ? (
+      {projectsLoadState === "loading" || (selectedProjectId && loading) ? (
         <div className="flex flex-1 items-center justify-center text-sm text-text-tertiary">
           Loading board...
         </div>
+      ) : !selectedProjectId ? (
+        <NoProjectSelected title="Select a Project to open the Board" />
       ) : sprint ? (
         <div className="flex flex-1 gap-4 overflow-x-auto bg-background p-8">
           {STATUS_ORDER.map((status) => {
@@ -134,7 +233,7 @@ export default function BoardPage() {
             return (
               <div
                 key={status}
-                className="flex min-w-[260px] flex-1 flex-col rounded-lg border border-border bg-[#ebecf0] p-3.5"
+                className="flex min-w-[260px] flex-1 flex-col border border-border bg-surface-muted p-3.5"
               >
                 <div className="flex items-center justify-between px-1 pb-3">
                   <div className="flex items-center gap-2">
@@ -160,8 +259,10 @@ export default function BoardPage() {
                           : undefined
                       }
                       saving={savingItemId === item.id}
-                      onStatusChange={(status) =>
-                        void handleStatusChange(item, status)
+                      onStatusChange={
+                        canMutate
+                          ? (nextStatus) => void handleStatusChange(item, nextStatus)
+                          : undefined
                       }
                     />
                   ))}
@@ -171,16 +272,64 @@ export default function BoardPage() {
           })}
         </div>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-text-tertiary">
-          <p className="m-0">No active sprint.</p>
-          <Link
-            href="/sprints"
-            className="rounded-lg bg-brand px-3 py-2 text-xs font-bold text-white hover:bg-brand-dark"
-          >
-            Manage sprints
-          </Link>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-sm text-text-tertiary">
+          <p className="m-0 text-base font-semibold text-text">No active sprint</p>
+          <p className="m-0 max-w-md text-center">
+            Sprint metrics are unavailable until a Sprint is active. Review the
+            Backlog and Sprint list for this Project in the meantime.
+          </p>
+          {members.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {members.map((member) => (
+                <span
+                  key={member.id}
+                  className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-text-secondary"
+                >
+                  {member.name}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Link
+              href="/backlog"
+              className="border border-border bg-surface px-3 py-2 text-xs font-semibold text-text-secondary hover:border-accent hover:text-accent"
+            >
+              Open Backlog
+            </Link>
+            <Link
+              href="/sprints"
+              className="fl-cta px-4 py-2 text-xs"
+            >
+              {canMutate ? "Manage sprints" : "View sprints"}
+            </Link>
+          </div>
         </div>
       )}
+    </>
+  );
+}
+
+export default function BoardPage() {
+  const {
+    selectedProjectId,
+    selectedProject,
+    loadState: projectsLoadState,
+    currentUser,
+  } = useProjects();
+  const canMutate = canMutateExecution(currentUser?.roles);
+  // Members come from the Project the provider already loaded.
+  const members = useMemo(() => membersOf(selectedProject), [selectedProject]);
+
+  return (
+    <AppShell>
+      <BoardView
+        key={selectedProjectId ?? "none"}
+        selectedProjectId={selectedProjectId}
+        projectsLoadState={projectsLoadState}
+        canMutate={canMutate}
+        members={members}
+      />
     </AppShell>
   );
 }

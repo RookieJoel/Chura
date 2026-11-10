@@ -15,14 +15,20 @@ import (
 type SprintService struct {
 	repository out.SprintRepository
 	gateway    out.ProjectGateway
+	workItems  out.SprintWorkItemReader
 }
 
 var _ in.SprintService = (*SprintService)(nil)
 
-func NewSprintService(repository out.SprintRepository, gateway out.ProjectGateway) *SprintService {
+func NewSprintService(
+	repository out.SprintRepository,
+	gateway out.ProjectGateway,
+	workItems out.SprintWorkItemReader,
+) *SprintService {
 	return &SprintService{
 		repository: repository,
 		gateway:    gateway,
+		workItems:  workItems,
 	}
 }
 
@@ -49,6 +55,10 @@ func (s *SprintService) CreateSprint(
 	toCreate.ProjectID = projectID
 	if err := toCreate.Validate(); err != nil {
 		return nil, fmt.Errorf("create sprint: %w", err)
+	}
+	// A brand-new Sprint has no Work Items yet, so Active is never valid on create.
+	if toCreate.Status == domain.Active {
+		return nil, fmt.Errorf("create sprint: %w", errSprintNeedsWorkItems)
 	}
 
 	created, err := s.repository.Create(ctx, &toCreate)
@@ -107,12 +117,16 @@ func (s *SprintService) UpdateSprint(
 	sprint *domain.Sprint,
 ) (*domain.Sprint, error) {
 
-	if _, err := s.loadMutable(ctx, actor, id); err != nil {
+	existing, err := s.loadMutable(ctx, actor, id)
+	if err != nil {
 		return nil, fmt.Errorf("update sprint: %w", err)
 	}
 
 	toUpdate := *sprint
 	if err := toUpdate.Validate(); err != nil {
+		return nil, fmt.Errorf("update sprint: %w", err)
+	}
+	if err := s.requireWorkItemsToStart(ctx, existing, toUpdate.Status); err != nil {
 		return nil, fmt.Errorf("update sprint: %w", err)
 	}
 
@@ -122,6 +136,34 @@ func (s *SprintService) UpdateSprint(
 	}
 
 	return updated, nil
+}
+
+// errSprintNeedsWorkItems is returned when a Sprint would become Active with no
+// committed Work Items (proposal UC-03 alternate flow).
+var errSprintNeedsWorkItems = &domain.InvalidInputError{Violations: []domain.Violation{
+	{Field: "status", Message: "sprint cannot start without work items"},
+}}
+
+// requireWorkItemsToStart rejects a transition into Active when the Sprint has
+// zero Work Items. Ending a Sprint (Active → Completed) does not reassign
+// unfinished Work Items; they stay on the completed Sprint and appear as
+// carry-over only in analytics summaries.
+func (s *SprintService) requireWorkItemsToStart(
+	ctx context.Context,
+	existing *domain.Sprint,
+	nextStatus domain.SprintStatus,
+) error {
+	if nextStatus != domain.Active || existing.Status == domain.Active {
+		return nil
+	}
+	items, err := s.workItems.ListBySprint(ctx, existing.ProjectID, existing.ID)
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return errSprintNeedsWorkItems
+	}
+	return nil
 }
 
 func (s *SprintService) DeleteSprint(

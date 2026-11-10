@@ -59,10 +59,10 @@ export function ProfileMenu() {
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-background"
+        className="flex items-center gap-2 px-2 py-1.5 text-left hover:bg-background"
         onClick={() => setOpen((current) => !current)}
       >
-        <span className="flex size-7 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+        <span className="flex size-7 items-center justify-center bg-brand text-xs font-bold text-white">
           {identity.email.charAt(0).toUpperCase()}
         </span>
         <span className="hidden max-w-[150px] truncate text-[12px] font-semibold text-text sm:block">
@@ -72,11 +72,11 @@ export function ProfileMenu() {
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full z-10 mt-2 w-64 rounded-xl border border-border bg-surface p-3 shadow-lg"
+          className="absolute right-0 top-full z-10 mt-2 w-64 border border-border bg-surface p-3 shadow-lg"
           role="menu"
         >
           <div className="border-b border-border pb-3">
-            <p className="truncate text-sm font-bold text-text">{identity.email}</p>
+            <p className="truncate text-sm font-semibold text-text">{identity.email}</p>
             <p className="mt-1 break-all text-[11px] text-text-tertiary">
               ID: {identity.user_id}
             </p>
@@ -85,7 +85,7 @@ export function ProfileMenu() {
                 identity.roles.map((role) => (
                   <span
                     key={role}
-                    className="rounded-full bg-brand-tint px-2 py-1 text-[11px] font-bold text-brand-dark"
+                    className="bg-brand-tint px-2 py-1 text-[11px] font-semibold text-brand-dark"
                   >
                     {role}
                   </span>
@@ -98,7 +98,7 @@ export function ProfileMenu() {
           <button
             type="button"
             role="menuitem"
-            className="mt-3 w-full rounded-lg px-2 py-2 text-left text-[12px] font-bold text-text-secondary hover:bg-background"
+            className="mt-3 w-full px-2 py-2 text-left text-[12px] font-semibold text-text-secondary hover:bg-background"
             onClick={() => {
               window.location.href = new URL(
                 "/api/auth/logout",

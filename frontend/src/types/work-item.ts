@@ -1,6 +1,6 @@
 export type WorkItemType = "story" | "task" | "bug";
 
-export type WorkItemStatus = "todo" | "in_progress" | "review" | "done";
+export type WorkItemStatus = "todo" | "in_progress" | "review" | "done" | "blocked";
 
 export type Priority = "highest" | "high" | "medium" | "low";
 
@@ -53,7 +53,9 @@ export interface Sprint {
 export interface WorkItemComment {
   id: string;
   workItemId: string;
-  authorId: string;
+  authorUserId: string;
+  authorName: string;
+  authorEmail: string;
   body: string;
   createdAt: string;
 }

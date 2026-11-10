@@ -40,7 +40,7 @@ export function WorkItemRow({
       <Link
         href={`/work-items/${item.id}`}
         className={cn(
-          "group flex items-center gap-3 border-b border-border px-4 py-2.5 last:border-b-0 hover:bg-[#f4f5f7]",
+          "group flex items-center gap-3 border-b border-border px-4 py-2.5 last:border-b-0 hover:bg-background",
           className,
         )}
       >

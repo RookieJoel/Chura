@@ -32,11 +32,22 @@ async function proxy(request: Request, context: RouteContext<"/api/backend/[...p
     cache: "no-store",
   });
 
+  const headers = new Headers({
+    "content-type":
+      response.headers.get("content-type") ?? "application/json",
+  });
+  const contentDisposition = response.headers.get("content-disposition");
+  if (contentDisposition) {
+    headers.set("content-disposition", contentDisposition);
+  }
+  const contentTypeOptions = response.headers.get("x-content-type-options");
+  if (contentTypeOptions) {
+    headers.set("x-content-type-options", contentTypeOptions);
+  }
+
   return new NextResponse(response.body, {
     status: response.status,
-    headers: {
-      "content-type": response.headers.get("content-type") ?? "application/json",
-    },
+    headers,
   });
 }
 

@@ -66,7 +66,8 @@ frontend/.env.local:
 	  echo "KEYCLOAK_CLIENT_SECRET="; \
 	  echo "# CHURA_API_URL is the Kong gateway when using make up; same port for unified paths"; \
 	  echo "CHURA_API_URL=http://localhost:$(API_PORT)"; \
-	  echo "NEXT_PUBLIC_WORK_ITEM_RPC_URL=ws://localhost:$(API_PORT)/ws/work-items"; \
+	  echo "NEXT_PUBLIC_WORK_ITEM_RPC_URL=ws://127.0.0.1:$(API_PORT)/ws/work-items"; \
+	  echo "NEXT_PUBLIC_CHURA_PROJECT_ID=11111111-1111-4111-8111-111111111111"; \
 	} > $@
 	@echo "✔ created $@"
 
@@ -91,7 +92,7 @@ infra: backend/.env ## Start Keycloak, Postgres and MongoDB and wait until healt
 migrate: backend/.env ## Apply Postgres migrations (goose, in Docker)
 	$(DEPLOY) run --rm --build agile-execution-migrations
 
-seed-dev: backend/.env ## Seed local dev Postgres data (dev project row)
+seed-dev: backend/.env ## Seed project + sprints + work items + Keycloak membership
 	bash scripts/seed-dev-postgres.sh
 
 frontend-deps: ## Install frontend dependencies

@@ -1,6 +1,7 @@
 /**
- * Default project for local backlog/board work items until project onboarding exists.
- * Must stay in sync with backend/scripts/seed/dev_project.sql (make seed-dev).
+ * Seeded local Project id from `make seed-dev` / backend/scripts/seed/dev_project.sql.
+ * Board/Backlog/Sprints should use ProjectProvider selection; this remains an
+ * optional last-resort fallback for local tooling only.
  */
 export const SEEDED_DEV_PROJECT_ID =
   "11111111-1111-4111-8111-111111111111";

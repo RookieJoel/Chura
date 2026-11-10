@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	"github.com/RookieJoel/Chura/backend/internal/adapter/db"
 	memory "github.com/RookieJoel/Chura/backend/internal/adapter/db/postgres/repository"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/handler/http"
 	"github.com/RookieJoel/Chura/backend/internal/adapter/identity/keycloak"
@@ -17,10 +18,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	connections, err := runtime.ConnectPostgres(cfg)
+	postgresDB, err := db.ConnectPostgresDB(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
+	mongoConnection, err := db.ConnectMongoDB(cfg.MongoURI, cfg.MongoDatabase)
+	if err != nil {
+		log.Fatal(err)
+	}
+	connections := &db.Connections{Postgres: postgresDB, Mongo: mongoConnection}
 	defer func() {
 		if err := connections.Close(); err != nil {
 			log.Printf("close connections: %v", err)
@@ -42,6 +48,7 @@ func main() {
 	sprintService := service.NewSprintService(
 		memory.NewSprintRepository(connections.Postgres),
 		projectService,
+		connections.Mongo.SprintWorkItems,
 	)
 
 	authMiddleware, err := runtime.AuthMiddleware(cfg)

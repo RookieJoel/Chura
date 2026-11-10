@@ -133,7 +133,8 @@
         "realm-management": [
           "view-users",
           "manage-users",
-          "query-groups"
+          "query-groups",
+          "view-realm"
         ]
       }
     }
