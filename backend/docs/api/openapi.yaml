@@ -240,8 +240,9 @@ paths:
         "400":
           description: >-
             Malformed body, or a violation on `email`: blank, longer than 254
-            characters, missing `@`, or "user is not a Team Member" (the person
-            is an Auditor or has no Chura role).
+            characters, missing `@`, "this user does not exist" (no user has
+            this email), or "user is not a Team Member" (the person is an
+            Auditor or has no Chura role).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -252,7 +253,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "404":
-          description: Unknown Project, or no user with this email.
+          description: Unknown Project.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }

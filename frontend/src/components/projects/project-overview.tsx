@@ -434,7 +434,15 @@ export function ProjectOverview({ projectId }: { projectId: string }) {
       for (const row of draft.rows) {
         if (row.member) continue;
         step = `adding ${row.label}`;
-        latest = await addProjectMember(project.id, row.email);
+        try {
+          latest = await addProjectMember(project.id, row.email);
+        } catch (addError) {
+          // A 404 here means no account has this email, not a missing Project.
+          if (addError instanceof Error && /^not found\b/iu.test(addError.message)) {
+            throw new Error("This user doesn't exist. Check the email address and try again.");
+          }
+          throw addError;
+        }
         saved = true;
       }
       // 4. Roles, compared with what the server now holds (your own last).

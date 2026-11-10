@@ -133,22 +133,30 @@ func TestAddProjectMember_254RuneEmail_IsLookedUp(t *testing.T) {
 
 	_, err := svc.AddProjectMember(context.Background(), teamMember, seededProjectID, email)
 
-	if !errors.Is(err, domain.ErrNotFound) {
-		t.Fatalf("want ErrNotFound from lookup, got %v", err)
-	}
+	assertUserDoesNotExist(t, err)
 }
 
-func TestAddProjectMember_UnknownEmail_IsNotFound(t *testing.T) {
+func TestAddProjectMember_UnknownEmail_SaysUserDoesNotExist(t *testing.T) {
 	for _, templateID := range bothTemplates {
 		t.Run(templateID, func(t *testing.T) {
 			_, svc := projectWithTemplate(t, templateID)
 
 			_, err := svc.AddProjectMember(context.Background(), teamMember, seededProjectID, "ghost@example.com")
 
-			if !errors.Is(err, domain.ErrNotFound) {
-				t.Fatalf("want ErrNotFound, got %v", err)
-			}
+			assertUserDoesNotExist(t, err)
 		})
+	}
+}
+
+func assertUserDoesNotExist(t *testing.T, err error) {
+	t.Helper()
+	var invalid *domain.InvalidInputError
+	if !errors.As(err, &invalid) || len(invalid.Violations) != 1 ||
+		invalid.Violations[0].Field != "email" || invalid.Violations[0].Message != "this user does not exist" {
+		t.Fatalf("want email violation %q, got %v", "this user does not exist", err)
+	}
+	if errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("unknown email must not be a 404, got %v", err)
 	}
 }
 

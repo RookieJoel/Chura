@@ -275,6 +275,47 @@ describe("ProjectOverview", () => {
     expect(roleSelect.closest("li")).not.toHaveAttribute("data-missing-role");
   });
 
+  it.each([
+    ["an older backend's 404", "not found (404)"],
+    ["the backend's violation", "this user does not exist (400)"],
+  ])("says the user doesn't exist when adding an unknown email (%s)", async (_label, message) => {
+    vi.mocked(getProject).mockResolvedValue({
+      ...project,
+      members: [
+        {
+          id: "u1",
+          email: "owner@example.com",
+          name: "Project Owner",
+          role: "product_owner",
+          initials: "PO",
+          color: "#64748B",
+        },
+      ],
+    });
+    vi.mocked(addProjectMember).mockRejectedValue(new Error(message));
+
+    render(
+      <ProjectProvider>
+        <ProjectOverview projectId="p1" />
+      </ProjectProvider>,
+    );
+
+    fireEvent.change(await screen.findByLabelText("Member email"), {
+      target: { value: "ghost@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
+    fireEvent.change(screen.getByLabelText("Project Role for ghost@example.com"), {
+      target: { value: "developer" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "Unable to save: This user doesn't exist. Check the email address and try again.",
+    );
+    expect(alert).not.toHaveTextContent("This Project was not found");
+  });
+
   it("keeps a removal staged and explains a backend refusal under Save", async () => {
     vi.mocked(getProject).mockResolvedValue({
       ...project,

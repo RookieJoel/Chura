@@ -18,6 +18,8 @@ const KNOWN_ERRORS: Record<string, string> = {
     "The service is temporarily unavailable. Please try again shortly.",
   "internal server error":
     "Something went wrong on our side. Please try again.",
+  "this user does not exist":
+    "This user doesn't exist. Check the email address and try again.",
   "team member role required":
     "You need the Team Member role to create or manage Projects.",
 };

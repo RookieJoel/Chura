@@ -185,6 +185,11 @@ func (s *ProjectConfigurationService) AddProjectMember(ctx context.Context, acto
 		}})
 	}
 	user, err := s.directory.FindUserByEmail(ctx, email)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil, fmt.Errorf("add project member: %w", &domain.InvalidInputError{Violations: []domain.Violation{
+			{Field: "email", Message: "this user does not exist"},
+		}})
+	}
 	if err != nil {
 		return nil, fmt.Errorf("add project member: %w", err)
 	}
